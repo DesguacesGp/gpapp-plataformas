@@ -57,131 +57,121 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'sync_products') {
-      console.log('Syncing products for categories:', categories)
+      console.log('Syncing products - Starting authentication...')
       
       try {
         // Step 1: Authenticate with Vauner API
         const authUrl = `${vaunerUrl}/service/authenticate.php?user=${encodeURIComponent(vaunerUser)}&password=${encodeURIComponent(vaunerPassword)}`
-        console.log('Authenticating with Vauner...')
+        console.log('Auth URL:', authUrl)
         
         const authResponse = await fetch(authUrl)
         if (!authResponse.ok) {
-          throw new Error(`Authentication failed: ${authResponse.status}`)
+          throw new Error(`Authentication failed with status: ${authResponse.status}`)
         }
         
         const authData = await authResponse.json()
-        const token = authData.token
+        console.log('Auth response:', JSON.stringify(authData))
         
-        if (!token) {
-          throw new Error('No token received from Vauner API')
+        const guid = authData.guid
+        
+        if (!guid) {
+          throw new Error(`No GUID received. Response: ${JSON.stringify(authData)}`)
         }
         
-        console.log('Authentication successful, fetching products...')
+        if (authData.resp !== 'Authorized') {
+          throw new Error(`Authorization failed: ${authData.resp}`)
+        }
         
-        // Step 2: Fetch products for each category
+        console.log('Authentication successful, GUID received')
+        
+        // Step 2: Get all categories first
+        const categoriesUrl = `${vaunerUrl}/service/getcat.php?guid=${encodeURIComponent(guid)}&type=C`
+        console.log('Fetching categories from:', categoriesUrl)
+        
+        const categoriesResponse = await fetch(categoriesUrl)
+        if (!categoriesResponse.ok) {
+          throw new Error(`Failed to fetch categories: ${categoriesResponse.status}`)
+        }
+        
+        const categoriesData = await categoriesResponse.json()
+        console.log('Categories response:', JSON.stringify(categoriesData).substring(0, 200))
+        
+        if (categoriesData.resp !== 'Authorized') {
+          throw new Error('Categories fetch not authorized')
+        }
+        
+        // Step 3: Fetch products for each category
         const allProducts: VaunerProduct[] = []
+        const availableCategories = categoriesData.detail || []
         
-        for (const category of categories || []) {
-          const productsUrl = `${vaunerUrl}/service/products.php?token=${encodeURIComponent(token)}&category=${encodeURIComponent(category)}`
-          console.log(`Fetching products for category: ${category}`)
+        console.log(`Found ${availableCategories.length} categories, fetching products...`)
+        
+        // Fetch products for first 3 categories as a test
+        const categoriesToFetch = availableCategories.slice(0, 3)
+        
+        for (const category of categoriesToFetch) {
+          const categoryId = category.CODIGO
+          const categoryName = category.descricao
+          
+          const productsUrl = `${vaunerUrl}/service/getproductbycat.php?guid=${encodeURIComponent(guid)}&catId=${encodeURIComponent(categoryId)}`
+          console.log(`Fetching products for category ${categoryId} (${categoryName})`)
           
           const productsResponse = await fetch(productsUrl)
           if (!productsResponse.ok) {
-            console.error(`Failed to fetch products for ${category}: ${productsResponse.status}`)
+            console.error(`Failed to fetch products for ${categoryId}: ${productsResponse.status}`)
             continue
           }
           
           const productsData = await productsResponse.json()
           
+          if (productsData.resp !== 'Authorized') {
+            console.error(`Products fetch not authorized for category ${categoryId}`)
+            continue
+          }
+          
           // Transform Vauner API response to our format
-          if (productsData.products && Array.isArray(productsData.products)) {
-            for (const product of productsData.products) {
+          if (productsData.detail && Array.isArray(productsData.detail)) {
+            console.log(`Found ${productsData.detail.length} products in category ${categoryId}`)
+            
+            for (const product of productsData.detail) {
               allProducts.push({
-                sku: product.sku || product.code,
-                description: product.description || product.name,
-                stock: parseInt(product.stock) || 0,
-                price: parseFloat(product.price) || 0,
-                has_image: product.has_image === true || product.image_url !== null,
-                category: category,
+                sku: product.cod_artigo || product['cod artigo'],
+                description: product.descricao || product.deSCricaO,
+                stock: parseInt(product.Stock) || 0,
+                price: parseFloat(product.valor) || 0,
+                has_image: product.image === "1" || product.image === 1,
+                category: categoryName,
                 raw_data: product
               })
             }
           }
         }
         
+        console.log(`Total products collected: ${allProducts.length}`)
+        
         if (allProducts.length === 0) {
-          console.log('No products found, using mock data for demonstration')
-          // Fallback to mock data if no products returned
-          const mockProducts: VaunerProduct[] = [
-        {
-          sku: 'VAU-001',
-          description: 'PILOTO DELANTERO DERECHO CITROEN XANTIA 93-',
-          stock: 15,
-          price: 45.50,
-          has_image: true,
-          category: categories && categories.length > 0 ? categories[0] : 'Iluminación',
-          raw_data: { original: 'CITROEN XANTIA 93-*FAROLIM FRT DRT' }
-        },
-        {
-          sku: 'VAU-002',
-          description: 'RETROVISOR IZQUIERDO RENAULT CLIO 05-09',
-          stock: 8,
-          price: 32.00,
-          has_image: true,
-          category: categories && categories.length > 0 ? categories[0] : 'Espejos',
-          raw_data: { original: 'RENAULT CLIO 05-09 RETROVISOR ESQ' }
-        },
-        {
-          sku: 'VAU-003',
-          description: 'PARAGOLPES TRASERO VOLKSWAGEN GOLF VI 08-13',
-          stock: 5,
-          price: 125.00,
-          has_image: false,
-          category: categories && categories.length > 0 ? categories[0] : 'Carrocería',
-          raw_data: { original: 'VW GOLF VI 08-13 PARACHOQUE TRAS' }
-        }
-          ]
-          
-          // Upsert mock products
-          const { data: upsertedProducts, error: upsertError } = await supabaseClient
-            .from('vauner_products')
-            .upsert(
-              mockProducts.map(p => ({
-                sku: p.sku,
-                description: p.description,
-                stock: p.stock,
-                price: p.price,
-                has_image: p.has_image,
-                category: p.category,
-                raw_data: p.raw_data
-              })),
-              { onConflict: 'sku' }
-            )
-            .select()
-          
-          if (upsertError) throw upsertError
-          
           return new Response(
             JSON.stringify({ 
               success: true, 
-              productsCount: upsertedProducts?.length || 0,
-              message: 'Productos de demostración sincronizados' 
+              productsCount: 0,
+              message: 'No se encontraron productos en las categorías consultadas' 
             }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
         }
         
-        // Upsert real products from API
+        // Upsert products to database
+        console.log('Saving products to database...')
         const { data: upsertedProducts, error: upsertError } = await supabaseClient
           .from('vauner_products')
           .upsert(
             allProducts.map(p => ({
-            sku: p.sku,
-            description: p.description,
-            stock: p.stock,
-            price: p.price,
-            has_image: p.has_image,
-            category: p.category,
+              sku: p.sku,
+              description: p.description,
+              stock: p.stock,
+              price: p.price,
+              has_image: p.has_image,
+              category: p.category,
               raw_data: p.raw_data
             })),
             { onConflict: 'sku' }
@@ -193,13 +183,13 @@ Deno.serve(async (req) => {
           throw upsertError
         }
 
-        console.log('Products synced successfully from API:', upsertedProducts?.length)
+        console.log('Products saved successfully:', upsertedProducts?.length)
 
         return new Response(
           JSON.stringify({ 
             success: true, 
             productsCount: upsertedProducts?.length || 0,
-            message: 'Productos sincronizados correctamente desde Vauner' 
+            message: `${upsertedProducts?.length || 0} productos sincronizados correctamente desde Vauner API` 
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
@@ -210,11 +200,13 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'test_connection') {
-      console.log('Testing Vauner connection with:', { vaunerUrl, vaunerUser })
+      console.log('Testing Vauner connection...')
       
       try {
         // Try to authenticate with Vauner API
         const authUrl = `${vaunerUrl}/service/authenticate.php?user=${encodeURIComponent(vaunerUser)}&password=${encodeURIComponent(vaunerPassword)}`
+        console.log('Testing auth URL:', authUrl)
+        
         const authResponse = await fetch(authUrl)
         
         if (!authResponse.ok) {
@@ -222,9 +214,14 @@ Deno.serve(async (req) => {
         }
         
         const authData = await authResponse.json()
+        console.log('Test auth response:', JSON.stringify(authData))
         
-        if (!authData.token) {
-          throw new Error('No token received from API')
+        if (!authData.guid) {
+          throw new Error(`No GUID received from API. Response: ${JSON.stringify(authData)}`)
+        }
+        
+        if (authData.resp !== 'Authorized') {
+          throw new Error(`Authorization failed: ${authData.resp}`)
         }
         
         return new Response(
@@ -234,9 +231,8 @@ Deno.serve(async (req) => {
             credentials: {
               url: vaunerUrl,
               user: vaunerUser,
-              hasPassword: !!vaunerPassword,
-              hasGuid: !!vaunerGuid,
-              tokenReceived: true
+              authorized: true,
+              guidReceived: true
             }
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
