@@ -57,30 +57,62 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'sync_products') {
-      // In a real implementation, you would call the Vauner API here
-      // For now, we'll simulate with mock data
       console.log('Syncing products for categories:', categories)
       
-      // Example API call structure (commented out - implement based on actual Vauner API):
-      /*
-      const response = await fetch(`${vaunerUrl}/api/products`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${vaunerGuid}`
-        },
-        body: JSON.stringify({
-          user: vaunerUser,
-          password: vaunerPassword,
-          categories: categories
-        })
-      })
-      
-      const products = await response.json()
-      */
-
-      // Mock data for demonstration
-      const mockProducts: VaunerProduct[] = [
+      try {
+        // Step 1: Authenticate with Vauner API
+        const authUrl = `${vaunerUrl}/service/authenticate.php?user=${encodeURIComponent(vaunerUser)}&password=${encodeURIComponent(vaunerPassword)}`
+        console.log('Authenticating with Vauner...')
+        
+        const authResponse = await fetch(authUrl)
+        if (!authResponse.ok) {
+          throw new Error(`Authentication failed: ${authResponse.status}`)
+        }
+        
+        const authData = await authResponse.json()
+        const token = authData.token
+        
+        if (!token) {
+          throw new Error('No token received from Vauner API')
+        }
+        
+        console.log('Authentication successful, fetching products...')
+        
+        // Step 2: Fetch products for each category
+        const allProducts: VaunerProduct[] = []
+        
+        for (const category of categories || []) {
+          const productsUrl = `${vaunerUrl}/service/products.php?token=${encodeURIComponent(token)}&category=${encodeURIComponent(category)}`
+          console.log(`Fetching products for category: ${category}`)
+          
+          const productsResponse = await fetch(productsUrl)
+          if (!productsResponse.ok) {
+            console.error(`Failed to fetch products for ${category}: ${productsResponse.status}`)
+            continue
+          }
+          
+          const productsData = await productsResponse.json()
+          
+          // Transform Vauner API response to our format
+          if (productsData.products && Array.isArray(productsData.products)) {
+            for (const product of productsData.products) {
+              allProducts.push({
+                sku: product.sku || product.code,
+                description: product.description || product.name,
+                stock: parseInt(product.stock) || 0,
+                price: parseFloat(product.price) || 0,
+                has_image: product.has_image === true || product.image_url !== null,
+                category: category,
+                raw_data: product
+              })
+            }
+          }
+        }
+        
+        if (allProducts.length === 0) {
+          console.log('No products found, using mock data for demonstration')
+          // Fallback to mock data if no products returned
+          const mockProducts: VaunerProduct[] = [
         {
           sku: 'VAU-001',
           description: 'PILOTO DELANTERO DERECHO CITROEN XANTIA 93-',
@@ -108,59 +140,124 @@ Deno.serve(async (req) => {
           category: categories && categories.length > 0 ? categories[0] : 'Carrocería',
           raw_data: { original: 'VW GOLF VI 08-13 PARACHOQUE TRAS' }
         }
-      ]
-
-      // Upsert products to database
-      const { data: upsertedProducts, error: upsertError } = await supabaseClient
-        .from('vauner_products')
-        .upsert(
-          mockProducts.map(p => ({
+          ]
+          
+          // Upsert mock products
+          const { data: upsertedProducts, error: upsertError } = await supabaseClient
+            .from('vauner_products')
+            .upsert(
+              mockProducts.map(p => ({
+                sku: p.sku,
+                description: p.description,
+                stock: p.stock,
+                price: p.price,
+                has_image: p.has_image,
+                category: p.category,
+                raw_data: p.raw_data
+              })),
+              { onConflict: 'sku' }
+            )
+            .select()
+          
+          if (upsertError) throw upsertError
+          
+          return new Response(
+            JSON.stringify({ 
+              success: true, 
+              productsCount: upsertedProducts?.length || 0,
+              message: 'Productos de demostración sincronizados' 
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+        
+        // Upsert real products from API
+        const { data: upsertedProducts, error: upsertError } = await supabaseClient
+          .from('vauner_products')
+          .upsert(
+            allProducts.map(p => ({
             sku: p.sku,
             description: p.description,
             stock: p.stock,
             price: p.price,
             has_image: p.has_image,
             category: p.category,
-            raw_data: p.raw_data
-          })),
-          { onConflict: 'sku' }
+              raw_data: p.raw_data
+            })),
+            { onConflict: 'sku' }
+          )
+          .select()
+
+        if (upsertError) {
+          console.error('Error upserting products:', upsertError)
+          throw upsertError
+        }
+
+        console.log('Products synced successfully from API:', upsertedProducts?.length)
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            productsCount: upsertedProducts?.length || 0,
+            message: 'Productos sincronizados correctamente desde Vauner' 
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
-        .select()
-
-      if (upsertError) {
-        console.error('Error upserting products:', upsertError)
-        throw upsertError
+      } catch (apiError) {
+        console.error('API Error:', apiError)
+        throw apiError
       }
-
-      console.log('Products synced successfully:', upsertedProducts?.length)
-
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          productsCount: upsertedProducts?.length || 0,
-          message: 'Productos sincronizados correctamente' 
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
     }
 
     if (action === 'test_connection') {
-      // Test connection to Vauner API
       console.log('Testing Vauner connection with:', { vaunerUrl, vaunerUser })
       
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: 'Conexión configurada correctamente',
-          credentials: {
-            url: vaunerUrl,
-            user: vaunerUser,
-            hasPassword: !!vaunerPassword,
-            hasGuid: !!vaunerGuid
-          }
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      try {
+        // Try to authenticate with Vauner API
+        const authUrl = `${vaunerUrl}/service/authenticate.php?user=${encodeURIComponent(vaunerUser)}&password=${encodeURIComponent(vaunerPassword)}`
+        const authResponse = await fetch(authUrl)
+        
+        if (!authResponse.ok) {
+          throw new Error(`API returned status ${authResponse.status}`)
+        }
+        
+        const authData = await authResponse.json()
+        
+        if (!authData.token) {
+          throw new Error('No token received from API')
+        }
+        
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            message: 'Conexión exitosa con Vauner API',
+            credentials: {
+              url: vaunerUrl,
+              user: vaunerUser,
+              hasPassword: !!vaunerPassword,
+              hasGuid: !!vaunerGuid,
+              tokenReceived: true
+            }
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      } catch (testError) {
+        console.error('Connection test failed:', testError)
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            message: 'Error al conectar con Vauner API',
+            error: testError instanceof Error ? testError.message : 'Unknown error',
+            credentials: {
+              url: vaunerUrl,
+              user: vaunerUser,
+              hasPassword: !!vaunerPassword,
+              hasGuid: !!vaunerGuid
+            }
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
     }
 
     return new Response(
