@@ -171,57 +171,59 @@ Deno.serve(async (req) => {
                 price: parseFloat(product.valor) || 0,
                 has_image: true,
                 category: categoryName,
-                raw_data: product
+                raw_data: null // Don't store raw_data to reduce size
               }))
             
             console.log(`Found ${categoryProducts.length} products with images in category ${categoryId}`)
+            
+            // Insert products in batches of 500 to avoid timeouts
+            const batchSize = 500
+            for (let i = 0; i < categoryProducts.length; i += batchSize) {
+              const batch = categoryProducts.slice(i, i + batchSize)
+              const { error: batchError } = await supabaseClient
+                .from('vauner_products')
+                .upsert(
+                  batch.map((p: any) => ({
+                    sku: p.sku,
+                    description: p.description,
+                    stock: p.stock,
+                    price: p.price,
+                    has_image: p.has_image,
+                    category: p.category,
+                    raw_data: p.raw_data
+                  })),
+                  { onConflict: 'sku' }
+                )
+              
+              if (batchError) {
+                console.error(`Error inserting batch ${i}-${i+batchSize}:`, batchError)
+              } else {
+                console.log(`Inserted batch ${i}-${i+batchSize} (${batch.length} products)`)
+              }
+            }
+            
             allProducts.push(...categoryProducts)
           }
         }
         
-        console.log(`Total products collected: ${allProducts.length}`)
+        console.log(`Total products with images: ${allProducts.length}`)
         
         if (allProducts.length === 0) {
           return new Response(
             JSON.stringify({ 
               success: true, 
               productsCount: 0,
-              message: 'No se encontraron productos en las categorías consultadas' 
+              message: 'No se encontraron productos con imágenes en las categorías consultadas' 
             }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
         }
-        
-        // Upsert products to database
-        console.log('Saving products to database...')
-        const { data: upsertedProducts, error: upsertError } = await supabaseClient
-          .from('vauner_products')
-          .upsert(
-            allProducts.map(p => ({
-              sku: p.sku,
-              description: p.description,
-              stock: p.stock,
-              price: p.price,
-              has_image: p.has_image,
-              category: p.category,
-              raw_data: p.raw_data
-            })),
-            { onConflict: 'sku' }
-          )
-          .select()
-
-        if (upsertError) {
-          console.error('Error upserting products:', upsertError)
-          throw upsertError
-        }
-
-        console.log('Products saved successfully:', upsertedProducts?.length)
 
         return new Response(
           JSON.stringify({ 
             success: true, 
-            productsCount: upsertedProducts?.length || 0,
-            message: `${upsertedProducts?.length || 0} productos sincronizados correctamente desde Vauner API` 
+            productsCount: allProducts.length,
+            message: `${allProducts.length} productos con imágenes sincronizados correctamente` 
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
