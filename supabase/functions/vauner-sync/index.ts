@@ -106,10 +106,7 @@ Deno.serve(async (req) => {
         
         console.log(`Found ${availableCategories.length} categories, fetching products...`)
         
-        // Fetch products for first 3 categories as a test
-        const categoriesToFetch = availableCategories.slice(0, 3)
-        
-        for (const category of categoriesToFetch) {
+        for (const category of availableCategories) {
           const categoryId = category.CODIGO
           const categoryName = category.descricao
           
