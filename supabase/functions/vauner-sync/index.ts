@@ -134,8 +134,21 @@ Deno.serve(async (req) => {
           
           // Transform Vauner API response to our format (only products with images)
           if (productsData.detail && Array.isArray(productsData.detail)) {
+            console.log(`Total products in category ${categoryId}: ${productsData.detail.length}`)
+            
+            // Log sample of image values for debugging
+            const sampleProducts = productsData.detail.slice(0, 5)
+            console.log('Sample image values:', sampleProducts.map((p: any) => ({
+              sku: p.cod_artigo,
+              image: p.image,
+              imageType: typeof p.image
+            })))
+            
             const categoryProducts = productsData.detail
-              .filter((product: any) => product.image === "1" || product.image === 1) // Only products with images
+              .filter((product: any) => {
+                const hasImage = product.image === "1" || product.image === 1
+                return hasImage
+              })
               .map((product: any) => ({
                 sku: product.cod_artigo || product['cod artigo'],
                 description: product.descricao || product.deSCricaO,
