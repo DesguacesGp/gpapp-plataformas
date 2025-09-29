@@ -59,6 +59,19 @@ Deno.serve(async (req) => {
     if (action === 'sync_products') {
       console.log('Syncing products - Starting authentication...')
       
+      // Delete all existing products before syncing
+      console.log('Deleting existing products...')
+      const { error: deleteError } = await supabaseClient
+        .from('vauner_products')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000') // Delete all
+      
+      if (deleteError) {
+        console.error('Error deleting products:', deleteError)
+      } else {
+        console.log('Existing products deleted successfully')
+      }
+      
       try {
         // Step 1: Authenticate with Vauner API
         const authUrl = `${vaunerUrl}/service/authenticate.php?user=${encodeURIComponent(vaunerUser)}&password=${encodeURIComponent(vaunerPassword)}`
@@ -146,7 +159,9 @@ Deno.serve(async (req) => {
             
             const categoryProducts = productsData.detail
               .filter((product: any) => {
-                const hasImage = product.image === "1" || product.image === 1
+                // Products with images have a URL like "service/image.php?id=..."
+                // Products without images have "0" or empty
+                const hasImage = product.image && product.image !== "0" && product.image.includes('service/image.php')
                 return hasImage
               })
               .map((product: any) => ({
