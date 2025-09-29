@@ -126,21 +126,22 @@ Deno.serve(async (req) => {
             continue
           }
           
-          // Transform Vauner API response to our format
+          // Transform Vauner API response to our format (only products with images)
           if (productsData.detail && Array.isArray(productsData.detail)) {
-            console.log(`Found ${productsData.detail.length} products in category ${categoryId}`)
-            
-            for (const product of productsData.detail) {
-              allProducts.push({
+            const categoryProducts = productsData.detail
+              .filter((product: any) => product.image === "1" || product.image === 1) // Only products with images
+              .map((product: any) => ({
                 sku: product.cod_artigo || product['cod artigo'],
                 description: product.descricao || product.deSCricaO,
                 stock: parseInt(product.Stock) || 0,
                 price: parseFloat(product.valor) || 0,
-                has_image: product.image === "1" || product.image === 1,
+                has_image: true,
                 category: categoryName,
                 raw_data: product
-              })
-            }
+              }))
+            
+            console.log(`Found ${categoryProducts.length} products with images in category ${categoryId}`)
+            allProducts.push(...categoryProducts)
           }
         }
         
