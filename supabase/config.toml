@@ -1,0 +1,4 @@
+project_id = "ucylyiemqzhsbjbkewxt"
+
+[functions.vauner-sync]
+verify_jwt = false
