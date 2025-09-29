@@ -100,13 +100,19 @@ Deno.serve(async (req) => {
           throw new Error('Categories fetch not authorized')
         }
         
-        // Step 3: Fetch products for each category
+        // Step 3: Fetch products for specific categories only
         const allProducts: VaunerProduct[] = []
         const availableCategories = categoriesData.detail || []
         
-        console.log(`Found ${availableCategories.length} categories, fetching products...`)
+        // Only fetch products for categories 106, 105, 103
+        const targetCategoryIds = ['106', '105', '103']
+        const categoriesToFetch = availableCategories.filter((cat: any) => 
+          targetCategoryIds.includes(cat.CODIGO)
+        )
         
-        for (const category of availableCategories) {
+        console.log(`Found ${categoriesToFetch.length} target categories out of ${availableCategories.length} total categories`)
+        
+        for (const category of categoriesToFetch) {
           const categoryId = category.CODIGO
           const categoryName = category.descricao
           
