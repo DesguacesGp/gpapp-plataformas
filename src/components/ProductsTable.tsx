@@ -13,6 +13,8 @@ interface Product {
   price: number;
   has_image: boolean;
   category: string | null;
+  translated_title: string | null;
+  bullet_points: string[] | null;
 }
 
 interface ProductsTableProps {
@@ -95,6 +97,8 @@ export const ProductsTable = ({ products, onSelectionChange }: ProductsTableProp
               </TableHead>
               <TableHead>SKU</TableHead>
               <TableHead>Descripción</TableHead>
+              <TableHead>Título Traducido</TableHead>
+              <TableHead>Bullet Points</TableHead>
               <TableHead className="text-center">Stock</TableHead>
               <TableHead className="text-right">Precio</TableHead>
               <TableHead className="text-center">Imagen</TableHead>
@@ -104,7 +108,7 @@ export const ProductsTable = ({ products, onSelectionChange }: ProductsTableProp
           <TableBody>
             {filteredProducts.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                   No hay productos que mostrar
                 </TableCell>
               </TableRow>
@@ -119,6 +123,27 @@ export const ProductsTable = ({ products, onSelectionChange }: ProductsTableProp
                   </TableCell>
                   <TableCell className="font-medium">{product.sku}</TableCell>
                   <TableCell className="max-w-md truncate">{product.description}</TableCell>
+                  <TableCell className="max-w-md">
+                    {product.translated_title ? (
+                      <span className="text-sm">{product.translated_title}</span>
+                    ) : (
+                      <Badge variant="outline">Sin procesar</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="max-w-xs">
+                    {product.bullet_points && product.bullet_points.length > 0 ? (
+                      <ul className="text-xs space-y-1 list-disc list-inside">
+                        {product.bullet_points.slice(0, 2).map((bullet, idx) => (
+                          <li key={idx} className="truncate">{bullet}</li>
+                        ))}
+                        {product.bullet_points.length > 2 && (
+                          <li className="text-muted-foreground">+{product.bullet_points.length - 2} más...</li>
+                        )}
+                      </ul>
+                    ) : (
+                      <Badge variant="outline">Sin procesar</Badge>
+                    )}
+                  </TableCell>
                   <TableCell className="text-center">
                     <Badge variant={product.stock > 10 ? "default" : product.stock > 0 ? "secondary" : "destructive"}>
                       {product.stock}

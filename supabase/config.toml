@@ -2,3 +2,6 @@ project_id = "ucylyiemqzhsbjbkewxt"
 
 [functions.vauner-sync]
 verify_jwt = false
+
+[functions.process-products]
+verify_jwt = false

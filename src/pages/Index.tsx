@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { RefreshCw, Settings, Download, LogOut } from "lucide-react";
+import { RefreshCw, Settings, Download, LogOut, Sparkles } from "lucide-react";
 import { ProductsTable } from "@/components/ProductsTable";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -15,6 +15,8 @@ interface Product {
   price: number;
   has_image: boolean;
   category: string | null;
+  translated_title: string | null;
+  bullet_points: string[] | null;
 }
 
 const Index = () => {
@@ -23,6 +25,7 @@ const Index = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   // Check authentication
@@ -100,6 +103,31 @@ const Index = () => {
     }
   };
 
+  const processProducts = async () => {
+    if (selectedIds.length === 0) {
+      toast.warning('Selecciona al menos un producto para procesar');
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('process-products', {
+        body: { productIds: selectedIds }
+      });
+
+      if (error) throw error;
+
+      toast.success(data.message || 'Productos procesados correctamente');
+      loadProducts();
+      setSelectedIds([]);
+    } catch (error: any) {
+      console.error('Error processing products:', error);
+      toast.error('Error al procesar productos: ' + error.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const exportSelected = () => {
     if (selectedIds.length === 0) {
       toast.warning('Selecciona al menos un producto para exportar');
@@ -108,10 +136,12 @@ const Index = () => {
 
     const selectedProducts = products.filter(p => selectedIds.includes(p.id));
     const csv = [
-      ['SKU', 'Descripción', 'Stock', 'Precio', 'Imagen', 'Categoría'],
+      ['SKU', 'Descripción', 'Título Traducido', 'Bullet Points', 'Stock', 'Precio', 'Imagen', 'Categoría'],
       ...selectedProducts.map(p => [
         p.sku,
         p.description,
+        p.translated_title || '',
+        p.bullet_points ? p.bullet_points.join(' | ') : '',
         p.stock,
         p.price,
         p.has_image ? 'Sí' : 'No',
@@ -219,6 +249,14 @@ const Index = () => {
                 </CardDescription>
               </div>
               <div className="flex gap-2">
+                <Button
+                  onClick={processProducts}
+                  variant="secondary"
+                  disabled={selectedIds.length === 0 || isProcessing}
+                >
+                  <Sparkles className={`mr-2 h-4 w-4 ${isProcessing ? 'animate-pulse' : ''}`} />
+                  {isProcessing ? 'Procesando...' : 'Procesar con IA'}
+                </Button>
                 <Button
                   onClick={exportSelected}
                   variant="outline"

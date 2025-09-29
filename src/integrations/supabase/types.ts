@@ -40,6 +40,7 @@ export type Database = {
       }
       vauner_products: {
         Row: {
+          bullet_points: string[] | null
           category: string | null
           created_at: string
           description: string
@@ -49,9 +50,11 @@ export type Database = {
           raw_data: Json | null
           sku: string
           stock: number
+          translated_title: string | null
           updated_at: string
         }
         Insert: {
+          bullet_points?: string[] | null
           category?: string | null
           created_at?: string
           description: string
@@ -61,9 +64,11 @@ export type Database = {
           raw_data?: Json | null
           sku: string
           stock?: number
+          translated_title?: string | null
           updated_at?: string
         }
         Update: {
+          bullet_points?: string[] | null
           category?: string | null
           created_at?: string
           description?: string
@@ -73,6 +78,7 @@ export type Database = {
           raw_data?: Json | null
           sku?: string
           stock?: number
+          translated_title?: string | null
           updated_at?: string
         }
         Relationships: []
