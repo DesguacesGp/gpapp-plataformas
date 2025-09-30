@@ -60,6 +60,7 @@ Deno.serve(async (req) => {
     if (!OPENAI_API_KEY) {
       throw new Error('OPENAI_API_KEY not configured')
     }
+    console.log('OpenAI API Key configured:', OPENAI_API_KEY ? 'Yes (length: ' + OPENAI_API_KEY.length + ')' : 'No')
 
     // Get products to process
     const { data: products, error: fetchError } = await supabaseClient
@@ -222,10 +223,11 @@ Stock: ${product.stock}`
         }
 
         const aiData = await aiResponse.json()
+        console.log(`AI Response for ${product.sku}:`, JSON.stringify(aiData))
         const content = aiData.choices?.[0]?.message?.content
 
         if (!content) {
-          console.error(`No content from AI for ${product.sku}`)
+          console.error(`No content from AI for ${product.sku}. Full response:`, JSON.stringify(aiData))
           processedCount.failed++
           continue
         }
