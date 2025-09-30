@@ -93,16 +93,22 @@ Deno.serve(async (req) => {
           translatedDesc = translatedDesc.replace(regex, value)
         }
 
-        // Call AI to process the product
-        const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'google/gemini-2.5-flash',
-            messages: [
+        // Retry logic for rate limits
+        let aiResponse
+        let retries = 0
+        const maxRetries = 3
+        
+        while (retries <= maxRetries) {
+          // Call AI to process the product
+          aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'google/gemini-2.5-flash',
+              messages: [
               {
                 role: 'system',
                 content: `Eres un experto en traducción de productos de automoción del portugués al español y en generación de títulos SEO optimizados para Amazon y eBay.
@@ -161,11 +167,29 @@ Stock: ${product.stock}`
             temperature: 0.7,
             max_tokens: 1000
           }),
-        })
+          })
 
-        if (!aiResponse.ok) {
-          const errorText = await aiResponse.text()
-          console.error(`AI API error for ${product.sku}:`, aiResponse.status, errorText)
+          // Handle rate limiting with exponential backoff
+          if (aiResponse.status === 429) {
+            retries++
+            if (retries > maxRetries) {
+              console.error(`Max retries reached for ${product.sku} due to rate limiting`)
+              processedCount.failed++
+              break
+            }
+            const waitTime = Math.pow(2, retries) * 2000 // 4s, 8s, 16s
+            console.log(`Rate limited for ${product.sku}, waiting ${waitTime}ms before retry ${retries}/${maxRetries}`)
+            await new Promise(resolve => setTimeout(resolve, waitTime))
+            continue
+          }
+
+          // If success or other error, break the retry loop
+          break
+        }
+
+        if (!aiResponse || !aiResponse.ok) {
+          const errorText = aiResponse ? await aiResponse.text() : 'No response'
+          console.error(`AI API error for ${product.sku}:`, aiResponse?.status, errorText)
           processedCount.failed++
           continue
         }
@@ -208,8 +232,8 @@ Stock: ${product.stock}`
           processedCount.success++
         }
 
-        // Add delay to respect rate limits (100ms between requests)
-        await new Promise(resolve => setTimeout(resolve, 100))
+        // Add delay to respect rate limits (2000ms between requests)
+        await new Promise(resolve => setTimeout(resolve, 2000))
 
       } catch (error) {
         console.error(`Error processing product ${product.sku}:`, error)
