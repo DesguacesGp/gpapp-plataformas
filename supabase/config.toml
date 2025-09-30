@@ -8,3 +8,9 @@ verify_jwt = false
 
 [functions.extract-product-info]
 verify_jwt = false
+
+[functions.import-vehicle-models]
+verify_jwt = false
+
+[functions.match-vehicle-years]
+verify_jwt = false

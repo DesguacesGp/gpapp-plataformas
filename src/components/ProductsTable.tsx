@@ -30,6 +30,8 @@ interface Product {
   articulo: string | null;
   marca: string | null;
   modelo: string | null;
+  año_desde: string | null;
+  año_hasta: string | null;
 }
 
 interface ProductsTableProps {
@@ -269,6 +271,8 @@ export const ProductsTable = ({
               <TableHead className="w-24">
                 <SortButton field="modelo">Modelo</SortButton>
               </TableHead>
+              <TableHead className="w-24 text-center">Año Desde</TableHead>
+              <TableHead className="w-24 text-center">Año Hasta</TableHead>
               <TableHead className="w-40">
                 <SortButton field="description">Descripción</SortButton>
               </TableHead>
@@ -296,7 +300,7 @@ export const ProductsTable = ({
           <TableBody>
             {products.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={15} className="text-center py-8 text-muted-foreground">
                   No hay productos que mostrar
                 </TableCell>
               </TableRow>
@@ -313,6 +317,24 @@ export const ProductsTable = ({
                   <TableCell className="text-sm truncate max-w-[130px]">{product.articulo || "-"}</TableCell>
                   <TableCell className="text-sm truncate max-w-[100px]">{product.marca || "-"}</TableCell>
                   <TableCell className="text-sm truncate max-w-[100px]">{product.modelo || "-"}</TableCell>
+                  <TableCell className="text-center text-xs">
+                    {product.año_desde ? (
+                      <Badge variant="outline" className="font-mono text-[10px]">
+                        {product.año_desde.replace('.', '/')}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-center text-xs">
+                    {product.año_hasta ? (
+                      <Badge variant="outline" className="font-mono text-[10px]">
+                        {product.año_hasta.replace('.', '/')}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-xs truncate max-w-[160px]">{product.description}</TableCell>
                   <TableCell className="max-w-[130px]">
                     {product.translated_title ? (

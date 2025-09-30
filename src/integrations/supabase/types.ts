@@ -97,6 +97,8 @@ export type Database = {
       }
       vauner_products: {
         Row: {
+          año_desde: string | null
+          año_hasta: string | null
           articulo: string | null
           bullet_points: string[] | null
           category: string | null
@@ -114,6 +116,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          año_desde?: string | null
+          año_hasta?: string | null
           articulo?: string | null
           bullet_points?: string[] | null
           category?: string | null
@@ -131,6 +135,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          año_desde?: string | null
+          año_hasta?: string | null
           articulo?: string | null
           bullet_points?: string[] | null
           category?: string | null
@@ -145,6 +151,39 @@ export type Database = {
           sku?: string
           stock?: number
           translated_title?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      vehicle_models: {
+        Row: {
+          año_desde: string
+          created_at: string
+          gama: string
+          id: string
+          id_gama: number
+          id_marca: number
+          marca: string
+          updated_at: string
+        }
+        Insert: {
+          año_desde: string
+          created_at?: string
+          gama: string
+          id?: string
+          id_gama: number
+          id_marca: number
+          marca: string
+          updated_at?: string
+        }
+        Update: {
+          año_desde?: string
+          created_at?: string
+          gama?: string
+          id?: string
+          id_gama?: number
+          id_marca?: number
+          marca?: string
           updated_at?: string
         }
         Relationships: []
