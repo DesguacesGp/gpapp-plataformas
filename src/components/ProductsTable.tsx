@@ -227,8 +227,9 @@ export const ProductsTable = ({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex gap-4 items-center">
+    <TooltipProvider>
+      <div className="space-y-4">
+        <div className="flex gap-4 items-center">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
@@ -338,49 +339,45 @@ export const ProductsTable = ({
                   </TableCell>
                   <TableCell className="text-xs truncate max-w-[160px]">{product.description}</TableCell>
                   <TableCell className="text-center">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger>
-                          {product.translated_title ? (
-                            <Check className="h-5 w-5 text-green-600 mx-auto" />
-                          ) : (
-                            <Clock className="h-5 w-5 text-muted-foreground mx-auto" />
-                          )}
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-md">
-                          <p className="text-xs">
-                            {product.translated_title || "Sin procesar"}
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        {product.translated_title ? (
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        ) : (
+                          <Clock className="h-5 w-5 text-muted-foreground mx-auto" />
+                        )}
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-md">
+                        <p className="text-xs">
+                          {product.translated_title || "Sin procesar"}
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
                   </TableCell>
                   <TableCell className="text-center">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger>
-                          {product.bullet_points && product.bullet_points.length > 0 ? (
-                            <div className="flex items-center justify-center gap-1">
-                              <Check className="h-5 w-5 text-green-600" />
-                              <span className="text-xs font-medium">{product.bullet_points.length}</span>
-                            </div>
-                          ) : (
-                            <Clock className="h-5 w-5 text-muted-foreground mx-auto" />
-                          )}
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-md">
-                          {product.bullet_points && product.bullet_points.length > 0 ? (
-                            <ul className="text-xs space-y-1 list-disc pl-4">
-                              {product.bullet_points.map((bullet, idx) => (
-                                <li key={idx}>{bullet}</li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <p className="text-xs">Sin procesar</p>
-                          )}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        {product.bullet_points && product.bullet_points.length > 0 ? (
+                          <div className="flex items-center justify-center gap-1">
+                            <Check className="h-5 w-5 text-green-600" />
+                            <span className="text-xs font-medium">{product.bullet_points.length}</span>
+                          </div>
+                        ) : (
+                          <Clock className="h-5 w-5 text-muted-foreground mx-auto" />
+                        )}
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-md">
+                        {product.bullet_points && product.bullet_points.length > 0 ? (
+                          <ul className="text-xs space-y-1 list-disc pl-4">
+                            {product.bullet_points.map((bullet, idx) => (
+                              <li key={idx}>{bullet}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-xs">Sin procesar</p>
+                        )}
+                      </TooltipContent>
+                    </Tooltip>
                   </TableCell>
                   <TableCell className="text-center">
                     <Badge variant={product.stock > 10 ? "default" : product.stock > 0 ? "secondary" : "destructive"}>
@@ -437,5 +434,6 @@ export const ProductsTable = ({
         )}
       </div>
     </div>
+    </TooltipProvider>
   );
 };
