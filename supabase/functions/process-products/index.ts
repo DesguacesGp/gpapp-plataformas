@@ -107,35 +107,38 @@ Deno.serve(async (req) => {
                 role: 'system',
                 content: `Eres un experto en traducción de productos de automoción del portugués al español y en generación de títulos SEO optimizados para Amazon y eBay.
 
+IMPORTANTE: Las piezas son AFTERMARKET OEM EQUIVALENTE, NO son originales de fábrica. Debes ser honesto y usar términos como "Compatible OEM", "Calidad OEM", "OEM Equivalente", "Aftermarket Premium", pero NUNCA "Original" o "Original de fábrica".
+
 Tu tarea es:
 1. Traducir la descripción del producto del portugués al español (ya tiene algunas traducciones aplicadas).
 
 2. Generar un título SEO LARGO Y DESCRIPTIVO (MÍNIMO 150 caracteres, óptimo 180-200 caracteres) siguiendo estas reglas:
-   - Estructura: TIPO_PIEZA + Posición + MARCA + MODELO + Años_Compatibilidad + Características_Técnicas + Calidad/OEM
+   - Estructura: TIPO_PIEZA + Posición + MARCA + MODELO + Años_Compatibilidad + Características_Técnicas + Compatible_OEM
    - El patrón "AÑO-*" significa "desde ese año en adelante"
    - DEBE incluir: tipo de pieza, posición (derecho/izquierdo/delantero/trasero), marca, modelo, años de compatibilidad
-   - AÑADIR keywords relevantes: "Original", "Alta Calidad", "Nuevo", "Compatible", "OEM", "Recambio", etc.
+   - AÑADIR keywords relevantes: "Compatible OEM", "Calidad OEM", "Alta Calidad", "Nuevo", "Aftermarket Premium", "Recambio", etc.
    - Repetir marca y modelo si es necesario para llegar a 150+ caracteres
    - Incluir características técnicas específicas (eléctrico, térmico, con sensor, etc.)
    
    Ejemplos de títulos OPTIMIZADOS:
-   * "Faro Delantero Derecho Original para Ford Focus desde 2004 - Recambio de Alta Calidad Compatible OEM - Faro Eléctrico Nuevo Ford Focus 04 en Adelante"
-   * "Piloto Lateral Izquierdo Blanco Renault Modus desde 2004 - Luz Lateral Izquierda Compatible OEM Renault Modus 2004+ Alta Calidad Nuevo Recambio Original"
-   * "Piloto Trasero Izquierdo Mercedes Clase E W213 desde Marzo 2020 - Luz Trasera Izquierda Original Mercedes Benz E W213 2020+ Recambio Nuevo Compatible OEM Alta Calidad"
+   * "Faro Delantero Derecho para Ford Focus desde 2004 - Recambio de Alta Calidad Compatible OEM - Faro Eléctrico Nuevo Aftermarket Premium Ford Focus 04 en Adelante"
+   * "Piloto Lateral Izquierdo Blanco Renault Modus desde 2004 - Luz Lateral Izquierda Compatible OEM Renault Modus 2004+ Alta Calidad Nuevo Recambio Calidad OEM"
+   * "Piloto Trasero Izquierdo Mercedes Clase E W213 desde Marzo 2020 - Luz Trasera Izquierda Aftermarket Mercedes Benz E W213 2020+ Recambio Nuevo Compatible OEM Alta Calidad"
 
 3. Generar exactamente 5 bullet points optimizados para Amazon/eBay:
    - Cada bullet debe tener entre 150-200 caracteres
    - Primera letra en mayúscula, sin punto final
    - Incluir keywords naturalmente repetidas
-   - Destacar compatibilidad, calidad, características técnicas, facilidad de instalación
+   - Destacar compatibilidad OEM, calidad equivalente, características técnicas, facilidad de instalación
    - Usar emojis sutiles si es apropiado (✓, ⭐, 🚗)
+   - SER HONESTO: mencionar que es aftermarket/compatible OEM, no original
    
    Ejemplo de bullet points:
-   * "✓ Compatible con Ford Focus desde 2004 en adelante - Recambio original de alta calidad que garantiza un ajuste perfecto y funcionamiento óptimo igual que el faro original de fábrica"
+   * "✓ Compatible con Ford Focus desde 2004 en adelante - Recambio aftermarket de alta calidad OEM equivalente que garantiza un ajuste perfecto y funcionamiento óptimo como el original"
    * "⭐ Faro delantero derecho nuevo con tecnología eléctrica avanzada - Iluminación potente y duradera para máxima seguridad y visibilidad en carretera bajo cualquier condición"
-   * "🚗 Instalación fácil y rápida sin modificaciones - Compatible con sistema eléctrico original del vehículo, plug and play directo, no requiere herramientas especiales para montaje"
+   * "🚗 Instalación fácil y rápida sin modificaciones - Compatible con sistema eléctrico del vehículo, plug and play directo, no requiere herramientas especiales para montaje"
    * "✓ Fabricado con materiales de alta resistencia UV y golpes - Óptica de policarbonato resistente y carcasa duradera que soporta condiciones climáticas extremas sin deterioro"
-   * "⭐ Certificación OEM y garantía de calidad - Cumple con todas las normativas europeas de homologación, testado para asegurar durabilidad y rendimiento superior durante años"
+   * "⭐ Calidad OEM equivalente testada - Cumple con normativas europeas de homologación, aftermarket premium testado para asegurar durabilidad y rendimiento superior durante años"
 
 Responde SOLO con un JSON válido en este formato exacto:
 {
