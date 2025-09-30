@@ -1,10 +1,19 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Search } from "lucide-react";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 interface Product {
   id: string;
@@ -22,58 +31,48 @@ interface Product {
 interface ProductsTableProps {
   products: Product[];
   onSelectionChange: (selectedIds: string[]) => void;
+  searchTerm: string;
+  onSearchChange: (search: string) => void;
+  categoryFilter: string;
+  onCategoryChange: (category: string) => void;
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  totalProducts: number;
 }
 
-type SortField = 'sku' | 'description' | 'stock' | 'price' | 'final_price' | 'category' | 'translated_title';
-type SortDirection = 'asc' | 'desc';
-
-export const ProductsTable = ({ products, onSelectionChange }: ProductsTableProps) => {
+export const ProductsTable = ({ 
+  products, 
+  onSelectionChange,
+  searchTerm,
+  onSearchChange,
+  categoryFilter,
+  onCategoryChange,
+  currentPage,
+  totalPages,
+  onPageChange,
+  totalProducts
+}: ProductsTableProps) => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [searchTerm, setSearchTerm] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [sortField, setSortField] = useState<SortField>('sku');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [localSearch, setLocalSearch] = useState(searchTerm);
 
-  const categories = Array.from(new Set(products.map(p => p.category).filter(Boolean))) as string[];
+  // Get categories from backend (we'll use a simple approach)
+  const [categories, setCategories] = useState<string[]>([]);
 
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDirection('asc');
-    }
-  };
+  useEffect(() => {
+    // Extract unique categories from current products
+    const uniqueCategories = Array.from(new Set(products.map(p => p.category).filter(Boolean))) as string[];
+    setCategories(uniqueCategories);
+  }, [products]);
 
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) return <ArrowUpDown className="ml-2 h-4 w-4" />;
-    return sortDirection === 'asc' 
-      ? <ArrowUp className="ml-2 h-4 w-4" />
-      : <ArrowDown className="ml-2 h-4 w-4" />;
-  };
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onSearchChange(localSearch);
+    }, 500);
 
-  const filteredProducts = products.filter(product => {
-    const matchesSearch = 
-      product.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.description.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesCategory = categoryFilter === "all" || product.category === categoryFilter;
-    
-    return matchesSearch && matchesCategory;
-  }).sort((a, b) => {
-    let aVal: any = a[sortField];
-    let bVal: any = b[sortField];
-    
-    if (aVal === null || aVal === undefined) aVal = '';
-    if (bVal === null || bVal === undefined) bVal = '';
-    
-    if (typeof aVal === 'string') aVal = aVal.toLowerCase();
-    if (typeof bVal === 'string') bVal = bVal.toLowerCase();
-    
-    if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
-    if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
-    return 0;
-  });
+    return () => clearTimeout(timer);
+  }, [localSearch, onSearchChange]);
 
   const toggleSelect = (id: string) => {
     const newSelected = new Set(selectedIds);
@@ -87,14 +86,97 @@ export const ProductsTable = ({ products, onSelectionChange }: ProductsTableProp
   };
 
   const toggleSelectAll = () => {
-    if (selectedIds.size === filteredProducts.length) {
+    if (selectedIds.size === products.length) {
       setSelectedIds(new Set());
       onSelectionChange([]);
     } else {
-      const allIds = new Set(filteredProducts.map(p => p.id));
+      const allIds = new Set(products.map(p => p.id));
       setSelectedIds(allIds);
       onSelectionChange(Array.from(allIds));
     }
+  };
+
+  const renderPaginationItems = () => {
+    const items = [];
+    const maxVisible = 5;
+    
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) {
+        items.push(
+          <PaginationItem key={i}>
+            <PaginationLink
+              onClick={() => onPageChange(i)}
+              isActive={currentPage === i}
+              className="cursor-pointer"
+            >
+              {i}
+            </PaginationLink>
+          </PaginationItem>
+        );
+      }
+    } else {
+      // Always show first page
+      items.push(
+        <PaginationItem key={1}>
+          <PaginationLink
+            onClick={() => onPageChange(1)}
+            isActive={currentPage === 1}
+            className="cursor-pointer"
+          >
+            1
+          </PaginationLink>
+        </PaginationItem>
+      );
+
+      if (currentPage > 3) {
+        items.push(
+          <PaginationItem key="ellipsis1">
+            <PaginationEllipsis />
+          </PaginationItem>
+        );
+      }
+
+      // Show pages around current page
+      const start = Math.max(2, currentPage - 1);
+      const end = Math.min(totalPages - 1, currentPage + 1);
+      
+      for (let i = start; i <= end; i++) {
+        items.push(
+          <PaginationItem key={i}>
+            <PaginationLink
+              onClick={() => onPageChange(i)}
+              isActive={currentPage === i}
+              className="cursor-pointer"
+            >
+              {i}
+            </PaginationLink>
+          </PaginationItem>
+        );
+      }
+
+      if (currentPage < totalPages - 2) {
+        items.push(
+          <PaginationItem key="ellipsis2">
+            <PaginationEllipsis />
+          </PaginationItem>
+        );
+      }
+
+      // Always show last page
+      items.push(
+        <PaginationItem key={totalPages}>
+          <PaginationLink
+            onClick={() => onPageChange(totalPages)}
+            isActive={currentPage === totalPages}
+            className="cursor-pointer"
+          >
+            {totalPages}
+          </PaginationLink>
+        </PaginationItem>
+      );
+    }
+    
+    return items;
   };
 
   return (
@@ -104,14 +186,14 @@ export const ProductsTable = ({ products, onSelectionChange }: ProductsTableProp
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
             placeholder="Buscar por SKU o descripción..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            value={localSearch}
+            onChange={(e) => setLocalSearch(e.target.value)}
             className="pl-10"
           />
         </div>
         <select
           value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
+          onChange={(e) => onCategoryChange(e.target.value)}
           className="px-4 py-2 border rounded-md bg-background"
         >
           <option value="all">Todas las categorías</option>
@@ -127,93 +209,30 @@ export const ProductsTable = ({ products, onSelectionChange }: ProductsTableProp
             <TableRow>
               <TableHead className="w-12">
                 <Checkbox
-                  checked={selectedIds.size === filteredProducts.length && filteredProducts.length > 0}
+                  checked={selectedIds.size === products.length && products.length > 0}
                   onCheckedChange={toggleSelectAll}
                 />
               </TableHead>
-              <TableHead>
-                <Button 
-                  variant="ghost" 
-                  onClick={() => handleSort('sku')}
-                  className="h-8 p-0 hover:bg-transparent font-semibold"
-                >
-                  SKU
-                  <SortIcon field="sku" />
-                </Button>
-              </TableHead>
-              <TableHead>
-                <Button 
-                  variant="ghost" 
-                  onClick={() => handleSort('description')}
-                  className="h-8 p-0 hover:bg-transparent font-semibold"
-                >
-                  Descripción
-                  <SortIcon field="description" />
-                </Button>
-              </TableHead>
-              <TableHead>
-                <Button 
-                  variant="ghost" 
-                  onClick={() => handleSort('translated_title')}
-                  className="h-8 p-0 hover:bg-transparent font-semibold"
-                >
-                  Título Traducido
-                  <SortIcon field="translated_title" />
-                </Button>
-              </TableHead>
-              <TableHead>Bullet Points</TableHead>
-              <TableHead className="text-center">
-                <Button 
-                  variant="ghost" 
-                  onClick={() => handleSort('stock')}
-                  className="h-8 p-0 hover:bg-transparent font-semibold"
-                >
-                  Stock
-                  <SortIcon field="stock" />
-                </Button>
-              </TableHead>
-              <TableHead className="text-right">
-                <Button 
-                  variant="ghost" 
-                  onClick={() => handleSort('price')}
-                  className="h-8 p-0 hover:bg-transparent font-semibold"
-                >
-                  Precio Base
-                  <SortIcon field="price" />
-                </Button>
-              </TableHead>
-              <TableHead className="text-right">
-                <Button 
-                  variant="ghost" 
-                  onClick={() => handleSort('final_price')}
-                  className="h-8 p-0 hover:bg-transparent font-semibold"
-                >
-                  Precio Final
-                  <SortIcon field="final_price" />
-                </Button>
-              </TableHead>
-              <TableHead className="text-center">Imagen</TableHead>
-              <TableHead>
-                <Button 
-                  variant="ghost" 
-                  onClick={() => handleSort('category')}
-                  className="h-8 p-0 hover:bg-transparent font-semibold"
-                >
-                  Categoría
-                  <SortIcon field="category" />
-                </Button>
-              </TableHead>
+              <TableHead className="font-semibold">SKU</TableHead>
+              <TableHead className="font-semibold">Descripción</TableHead>
+              <TableHead className="font-semibold">Título Traducido</TableHead>
+              <TableHead className="font-semibold">Bullet Points</TableHead>
+              <TableHead className="text-center font-semibold">Stock</TableHead>
+              <TableHead className="text-right font-semibold">Precio Base</TableHead>
+              <TableHead className="text-right font-semibold">Precio Final</TableHead>
+              <TableHead className="text-center font-semibold">Imagen</TableHead>
+              <TableHead className="font-semibold">Categoría</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredProducts.length === 0 ? (
+            {products.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                   No hay productos que mostrar
                 </TableCell>
               </TableRow>
             ) : (
-              filteredProducts.map((product) => (
+              products.map((product) => (
                 <TableRow key={product.id}>
                   <TableCell>
                     <Checkbox
@@ -270,9 +289,33 @@ export const ProductsTable = ({ products, onSelectionChange }: ProductsTableProp
         </Table>
       </div>
 
-      <div className="text-sm text-muted-foreground">
-        Mostrando {filteredProducts.length} de {products.length} productos
-        {selectedIds.size > 0 && ` • ${selectedIds.size} seleccionados`}
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-muted-foreground">
+          Mostrando {products.length} de {totalProducts} productos (página {currentPage} de {totalPages})
+          {selectedIds.size > 0 && ` • ${selectedIds.size} seleccionados`}
+        </div>
+        
+        {totalPages > 1 && (
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() => currentPage > 1 && onPageChange(currentPage - 1)}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50 cursor-not-allowed" : "cursor-pointer"}
+                />
+              </PaginationItem>
+              
+              {renderPaginationItems()}
+              
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() => currentPage < totalPages && onPageChange(currentPage + 1)}
+                  className={currentPage === totalPages ? "pointer-events-none opacity-50 cursor-not-allowed" : "cursor-pointer"}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        )}
       </div>
     </div>
   );

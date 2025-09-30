@@ -28,6 +28,13 @@ const Index = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  
+  // Pagination and filters
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const productsPerPage = 20;
 
   // Check authentication
   useEffect(() => {
@@ -50,10 +57,32 @@ const Index = () => {
   const loadProducts = async () => {
     setIsLoading(true);
     try {
-      const { data: productsData, error: productsError } = await supabase
+      // Build query with filters
+      let query = supabase
         .from('vauner_products')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('*', { count: 'exact' });
+
+      // Apply search filter
+      if (searchTerm) {
+        query = query.or(`sku.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
+      }
+
+      // Apply category filter
+      if (categoryFilter !== "all") {
+        query = query.eq('category', categoryFilter);
+      }
+
+      // Get total count for pagination
+      const { count } = await query;
+      setTotalProducts(count || 0);
+
+      // Apply pagination and ordering
+      const from = (currentPage - 1) * productsPerPage;
+      const to = from + productsPerPage - 1;
+      
+      const { data: productsData, error: productsError } = await query
+        .order('created_at', { ascending: false })
+        .range(from, to);
 
       if (productsError) throw productsError;
 
@@ -209,7 +238,19 @@ const Index = () => {
     if (!isCheckingAuth) {
       loadProducts();
     }
-  }, [isCheckingAuth]);
+  }, [isCheckingAuth, currentPage, searchTerm, categoryFilter]);
+
+  const handleSearchChange = (search: string) => {
+    setSearchTerm(search);
+    setCurrentPage(1); // Reset to first page on search
+  };
+
+  const handleCategoryChange = (category: string) => {
+    setCategoryFilter(category);
+    setCurrentPage(1); // Reset to first page on filter change
+  };
+
+  const totalPages = Math.ceil(totalProducts / productsPerPage);
 
   if (isCheckingAuth) {
     return (
@@ -251,7 +292,7 @@ const Index = () => {
               <CardTitle className="text-sm font-medium">Total Productos</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{products.length}</div>
+              <div className="text-3xl font-bold">{totalProducts}</div>
             </CardContent>
           </Card>
 
@@ -321,6 +362,14 @@ const Index = () => {
               <ProductsTable
                 products={products}
                 onSelectionChange={setSelectedIds}
+                searchTerm={searchTerm}
+                onSearchChange={handleSearchChange}
+                categoryFilter={categoryFilter}
+                onCategoryChange={handleCategoryChange}
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                totalProducts={totalProducts}
               />
             )}
           </CardContent>
