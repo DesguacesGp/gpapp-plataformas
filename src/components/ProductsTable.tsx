@@ -3,7 +3,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 
 interface Product {
   id: string;
@@ -22,12 +23,33 @@ interface ProductsTableProps {
   onSelectionChange: (selectedIds: string[]) => void;
 }
 
+type SortField = 'sku' | 'description' | 'stock' | 'price' | 'category' | 'translated_title';
+type SortDirection = 'asc' | 'desc';
+
 export const ProductsTable = ({ products, onSelectionChange }: ProductsTableProps) => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [sortField, setSortField] = useState<SortField>('sku');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   const categories = Array.from(new Set(products.map(p => p.category).filter(Boolean))) as string[];
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown className="ml-2 h-4 w-4" />;
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="ml-2 h-4 w-4" />
+      : <ArrowDown className="ml-2 h-4 w-4" />;
+  };
 
   const filteredProducts = products.filter(product => {
     const matchesSearch = 
@@ -37,6 +59,19 @@ export const ProductsTable = ({ products, onSelectionChange }: ProductsTableProp
     const matchesCategory = categoryFilter === "all" || product.category === categoryFilter;
     
     return matchesSearch && matchesCategory;
+  }).sort((a, b) => {
+    let aVal: any = a[sortField];
+    let bVal: any = b[sortField];
+    
+    if (aVal === null || aVal === undefined) aVal = '';
+    if (bVal === null || bVal === undefined) bVal = '';
+    
+    if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+    if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+    
+    if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+    if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+    return 0;
   });
 
   const toggleSelect = (id: string) => {
@@ -95,14 +130,68 @@ export const ProductsTable = ({ products, onSelectionChange }: ProductsTableProp
                   onCheckedChange={toggleSelectAll}
                 />
               </TableHead>
-              <TableHead>SKU</TableHead>
-              <TableHead>Descripción</TableHead>
-              <TableHead>Título Traducido</TableHead>
+              <TableHead>
+                <Button 
+                  variant="ghost" 
+                  onClick={() => handleSort('sku')}
+                  className="h-8 p-0 hover:bg-transparent font-semibold"
+                >
+                  SKU
+                  <SortIcon field="sku" />
+                </Button>
+              </TableHead>
+              <TableHead>
+                <Button 
+                  variant="ghost" 
+                  onClick={() => handleSort('description')}
+                  className="h-8 p-0 hover:bg-transparent font-semibold"
+                >
+                  Descripción
+                  <SortIcon field="description" />
+                </Button>
+              </TableHead>
+              <TableHead>
+                <Button 
+                  variant="ghost" 
+                  onClick={() => handleSort('translated_title')}
+                  className="h-8 p-0 hover:bg-transparent font-semibold"
+                >
+                  Título Traducido
+                  <SortIcon field="translated_title" />
+                </Button>
+              </TableHead>
               <TableHead>Bullet Points</TableHead>
-              <TableHead className="text-center">Stock</TableHead>
-              <TableHead className="text-right">Precio</TableHead>
+              <TableHead className="text-center">
+                <Button 
+                  variant="ghost" 
+                  onClick={() => handleSort('stock')}
+                  className="h-8 p-0 hover:bg-transparent font-semibold"
+                >
+                  Stock
+                  <SortIcon field="stock" />
+                </Button>
+              </TableHead>
+              <TableHead className="text-right">
+                <Button 
+                  variant="ghost" 
+                  onClick={() => handleSort('price')}
+                  className="h-8 p-0 hover:bg-transparent font-semibold"
+                >
+                  Precio
+                  <SortIcon field="price" />
+                </Button>
+              </TableHead>
               <TableHead className="text-center">Imagen</TableHead>
-              <TableHead>Categoría</TableHead>
+              <TableHead>
+                <Button 
+                  variant="ghost" 
+                  onClick={() => handleSort('category')}
+                  className="h-8 p-0 hover:bg-transparent font-semibold"
+                >
+                  Categoría
+                  <SortIcon field="category" />
+                </Button>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
