@@ -220,14 +220,14 @@ const Index = () => {
     setIsProcessingAll(true);
     
     try {
-      toast.info('🤖 Iniciando procesamiento continuo con IA (batches de 10 productos)...');
+      toast.info('🤖 Iniciando procesamiento continuo con IA (batches de 20 productos)...');
       
       // Crear registro en processing_queue
       const { data: queueData, error: queueError } = await supabase
         .from('processing_queue')
         .insert({
           status: 'pending',
-          batch_size: 10,
+          batch_size: 20,
           total_count: 0,
           processed_count: 0
         })

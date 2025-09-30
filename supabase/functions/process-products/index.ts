@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
         .from('vauner_products')
         .select('id')
         .is('translated_title', null)
-        .limit(10)
+        .limit(20)
       
       productsToProcess = nextBatch?.map(p => p.id) || []
     }
@@ -395,7 +395,7 @@ Stock: ${product.stock}`
         .from('processing_queue')
         .insert({
           status: 'pending',
-          batch_size: 10,
+          batch_size: 20,
           total_count: remainingCount
         })
         .select()
