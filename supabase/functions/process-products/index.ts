@@ -123,6 +123,11 @@ INFORMACIÓN CLAVE SOBRE LATERALIDAD:
 - Cuando el producto es "Izquierdo" = Lado CONDUCTOR
 - Esta información es CRÍTICA y debe aparecer tanto en el título como en los bullet points para ayudar al cliente a elegir la pieza correcta
 
+INFORMACIÓN SOBRE PLEGABILIDAD DE RETROVISORES:
+- SOLO los retrovisores con "REB" (Abatible) son PLEGABLES ELECTRÓNICAMENTE
+- Los retrovisores SIN "REB" son PLEGABLES MANUALMENTE
+- P/P significa "Para pintar" y NO tiene relación con plegabilidad
+
 Tu tarea es:
 1. Traducir la descripción del producto del portugués al español (ya tiene algunas traducciones aplicadas).
 
