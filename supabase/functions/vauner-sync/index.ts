@@ -35,12 +35,12 @@ Deno.serve(async (req) => {
     if (action === 'resume_processing') {
       console.log('Resuming AI processing for unprocessed products...')
       
-      // Get up to 15 unprocessed products (reduced to avoid timeouts)
+      // Get up to 50 unprocessed products per batch
       const { data: unprocessedProducts, error: countError } = await supabaseClient
         .from('vauner_products')
         .select('id')
         .is('translated_title', null)
-        .limit(15)
+        .limit(50)
       
       if (countError) {
         console.error('Error fetching unprocessed products:', countError)
