@@ -14,13 +14,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 interface Product {
   id: string;
@@ -628,53 +621,57 @@ const Index = () => {
             )}
           </CardContent>
         </Card>
-
-        {/* Dialog para reprocesar categoría */}
-        <Dialog open={isReprocessDialogOpen} onOpenChange={setIsReprocessDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Reprocesar Categoría Completa</DialogTitle>
-              <DialogDescription>
-                Selecciona una categoría para reprocesar todos sus productos con las últimas traducciones y configuraciones de IA.
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="py-4">
-              <Select value={selectedReprocessCategory} onValueChange={setSelectedReprocessCategory}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona una categoría" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableCategories.map((category) => (
-                    <SelectItem key={category} value={category}>
-                      {category}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setIsReprocessDialogOpen(false);
-                  setSelectedReprocessCategory("");
-                }}
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={reprocessCategory}
-                disabled={!selectedReprocessCategory}
-              >
-                <RotateCcw className="mr-2 h-4 w-4" />
-                Reprocesar
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
+
+      {/* Dialog para reprocesar categoría */}
+      <Dialog open={isReprocessDialogOpen} onOpenChange={setIsReprocessDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reprocesar Categoría Completa</DialogTitle>
+            <DialogDescription>
+              Selecciona una categoría para reprocesar todos sus productos con las últimas traducciones y configuraciones de IA.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <label htmlFor="category-select" className="block text-sm font-medium mb-2">
+              Categoría
+            </label>
+            <select
+              id="category-select"
+              value={selectedReprocessCategory}
+              onChange={(e) => setSelectedReprocessCategory(e.target.value)}
+              className="w-full px-3 py-2 border rounded-md bg-background text-foreground"
+            >
+              <option value="">Selecciona una categoría</option>
+              {availableCategories.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsReprocessDialogOpen(false);
+                setSelectedReprocessCategory("");
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={reprocessCategory}
+              disabled={!selectedReprocessCategory}
+            >
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Reprocesar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
