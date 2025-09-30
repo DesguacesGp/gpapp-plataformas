@@ -16,6 +16,7 @@ interface Product {
   category: string | null;
   translated_title: string | null;
   bullet_points: string[] | null;
+  final_price?: number;
 }
 
 interface ProductsTableProps {
@@ -23,7 +24,7 @@ interface ProductsTableProps {
   onSelectionChange: (selectedIds: string[]) => void;
 }
 
-type SortField = 'sku' | 'description' | 'stock' | 'price' | 'category' | 'translated_title';
+type SortField = 'sku' | 'description' | 'stock' | 'price' | 'final_price' | 'category' | 'translated_title';
 type SortDirection = 'asc' | 'desc';
 
 export const ProductsTable = ({ products, onSelectionChange }: ProductsTableProps) => {
@@ -177,8 +178,18 @@ export const ProductsTable = ({ products, onSelectionChange }: ProductsTableProp
                   onClick={() => handleSort('price')}
                   className="h-8 p-0 hover:bg-transparent font-semibold"
                 >
-                  Precio
+                  Precio Base
                   <SortIcon field="price" />
+                </Button>
+              </TableHead>
+              <TableHead className="text-right">
+                <Button 
+                  variant="ghost" 
+                  onClick={() => handleSort('final_price')}
+                  className="h-8 p-0 hover:bg-transparent font-semibold"
+                >
+                  Precio Final
+                  <SortIcon field="final_price" />
                 </Button>
               </TableHead>
               <TableHead className="text-center">Imagen</TableHead>
@@ -238,7 +249,12 @@ export const ProductsTable = ({ products, onSelectionChange }: ProductsTableProp
                       {product.stock}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right font-medium">€{product.price.toFixed(2)}</TableCell>
+                  <TableCell className="text-right font-medium text-muted-foreground">
+                    €{product.price.toFixed(2)}
+                  </TableCell>
+                  <TableCell className="text-right font-bold text-lg">
+                    €{(product.final_price || product.price).toFixed(2)}
+                  </TableCell>
                   <TableCell className="text-center">
                     <Badge variant={product.has_image ? "default" : "secondary"}>
                       {product.has_image ? "Sí" : "No"}

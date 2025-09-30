@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      pricing_config: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          margin_percentage: number
+          shipping_cost: number
+          updated_at: string
+          vat_percentage: number
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          id?: string
+          margin_percentage?: number
+          shipping_cost?: number
+          updated_at?: string
+          vat_percentage?: number
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          margin_percentage?: number
+          shipping_cost?: number
+          updated_at?: string
+          vat_percentage?: number
+        }
+        Relationships: []
+      }
       vauner_config: {
         Row: {
           config_key: string

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { RefreshCw, Settings, Download, LogOut, Sparkles } from "lucide-react";
+import { RefreshCw, Settings, Download, LogOut, Sparkles, DollarSign } from "lucide-react";
 import { ProductsTable } from "@/components/ProductsTable";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -17,6 +17,7 @@ interface Product {
   category: string | null;
   translated_title: string | null;
   bullet_points: string[] | null;
+  final_price?: number;
 }
 
 const Index = () => {
@@ -49,14 +50,48 @@ const Index = () => {
   const loadProducts = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data: productsData, error: productsError } = await supabase
         .from('vauner_products')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (productsError) throw productsError;
 
-      setProducts(data || []);
+      // Load pricing configs
+      const { data: pricingData, error: pricingError } = await supabase
+        .from('pricing_config')
+        .select('*');
+
+      if (pricingError) throw pricingError;
+
+      // Create a map of category to pricing config
+      const pricingMap = new Map(
+        (pricingData || []).map(p => [
+          p.category,
+          {
+            margin: p.margin_percentage,
+            vat: p.vat_percentage,
+            shipping: p.shipping_cost
+          }
+        ])
+      );
+
+      // Calculate final price for each product
+      const productsWithFinalPrice = (productsData || []).map(product => {
+        const pricing = pricingMap.get(product.category || '');
+        let finalPrice = product.price;
+
+        if (pricing) {
+          finalPrice = (product.price * (1 + pricing.margin / 100) * (1 + pricing.vat / 100)) + pricing.shipping;
+        }
+
+        return {
+          ...product,
+          final_price: finalPrice
+        };
+      });
+
+      setProducts(productsWithFinalPrice);
     } catch (error: any) {
       console.error('Error loading products:', error);
       toast.error('Error al cargar productos: ' + error.message);
@@ -136,7 +171,7 @@ const Index = () => {
 
     const selectedProducts = products.filter(p => selectedIds.includes(p.id));
     const csv = [
-      ['SKU', 'Descripción', 'Título Traducido', 'Bullet Points', 'Stock', 'Precio', 'Imagen', 'Categoría'],
+      ['SKU', 'Descripción', 'Título Traducido', 'Bullet Points', 'Stock', 'Precio Base', 'Precio Final', 'Imagen', 'Categoría'],
       ...selectedProducts.map(p => [
         p.sku,
         p.description,
@@ -144,6 +179,7 @@ const Index = () => {
         p.bullet_points ? p.bullet_points.join(' | ') : '',
         p.stock,
         p.price,
+        p.final_price || p.price,
         p.has_image ? 'Sí' : 'No',
         p.category || ''
       ])
@@ -193,6 +229,9 @@ const Index = () => {
           <div className="flex items-center justify-between mb-2">
             <h1 className="text-4xl font-bold tracking-tight">Panel Vauner</h1>
             <div className="flex gap-2">
+              <Button variant="outline" size="icon" onClick={() => navigate("/pricing")}>
+                <DollarSign className="h-4 w-4" />
+              </Button>
               <Button variant="outline" size="icon">
                 <Settings className="h-4 w-4" />
               </Button>
