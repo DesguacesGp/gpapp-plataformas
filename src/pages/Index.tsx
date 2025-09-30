@@ -92,6 +92,36 @@ const Index = () => {
     loadCategories();
   }, []);
 
+  // Subscribe to realtime updates for AI processing
+  useEffect(() => {
+    const channel = supabase
+      .channel('vauner-products-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'vauner_products'
+        },
+        (payload) => {
+          // Check if translated_title was just added (AI processing completed)
+          const oldRecord = payload.old as any;
+          const newRecord = payload.new as any;
+          
+          if (!oldRecord.translated_title && newRecord.translated_title) {
+            // Product was just processed by AI
+            setProcessedProducts(prev => prev + 1);
+            toast.success(`Producto procesado: ${newRecord.sku}`);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   const loadProducts = async () => {
     setIsLoading(true);
     try {
