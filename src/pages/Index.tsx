@@ -2,10 +2,25 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { RefreshCw, Settings, Download, LogOut, Sparkles, DollarSign } from "lucide-react";
+import { RefreshCw, Settings, Download, LogOut, Sparkles, DollarSign, RotateCcw } from "lucide-react";
 import { ProductsTable } from "@/components/ProductsTable";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Product {
   id: string;
@@ -33,6 +48,10 @@ const Index = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isProcessingAll, setIsProcessingAll] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [isReprocessDialogOpen, setIsReprocessDialogOpen] = useState(false);
+  const [selectedReprocessCategory, setSelectedReprocessCategory] = useState<string>("");
+  const [isReprocessing, setIsReprocessing] = useState(false);
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
   
   // Pagination and filters
   const [currentPage, setCurrentPage] = useState(1);
@@ -62,6 +81,23 @@ const Index = () => {
 
     return () => subscription.unsubscribe();
   }, [navigate]);
+
+  // Load available categories
+  useEffect(() => {
+    const loadCategories = async () => {
+      const { data, error } = await supabase
+        .from('category_config')
+        .select('category_name')
+        .eq('enabled', true)
+        .order('category_name', { ascending: true });
+
+      if (!error && data) {
+        setAvailableCategories(data.map(cat => cat.category_name));
+      }
+    };
+
+    loadCategories();
+  }, []);
 
   const loadProducts = async () => {
     setIsLoading(true);
@@ -267,6 +303,52 @@ const Index = () => {
     a.click();
     
     toast.success(`${selectedIds.length} productos exportados`);
+  };
+
+  const reprocessCategory = async () => {
+    if (!selectedReprocessCategory) {
+      toast.warning('Selecciona una categoría');
+      return;
+    }
+
+    setIsReprocessing(true);
+    setIsReprocessDialogOpen(false);
+
+    try {
+      // Get all product IDs from the selected category
+      const { data: categoryProducts, error: fetchError } = await supabase
+        .from('vauner_products')
+        .select('id')
+        .eq('category', selectedReprocessCategory);
+
+      if (fetchError) throw fetchError;
+
+      if (!categoryProducts || categoryProducts.length === 0) {
+        toast.warning(`No hay productos en la categoría "${selectedReprocessCategory}"`);
+        setIsReprocessing(false);
+        return;
+      }
+
+      const productIds = categoryProducts.map(p => p.id);
+      
+      toast.info(`🔄 Iniciando reprocesamiento de ${productIds.length} productos de "${selectedReprocessCategory}"...`);
+
+      // Call the process-products edge function
+      const { data, error } = await supabase.functions.invoke('process-products', {
+        body: { productIds }
+      });
+
+      if (error) throw error;
+
+      toast.success(`✅ ${data.message || 'Reprocesamiento completado'}`);
+      loadProducts();
+    } catch (error: any) {
+      console.error('Error reprocessing category:', error);
+      toast.error('Error al reprocesar: ' + error.message);
+    } finally {
+      setIsReprocessing(false);
+      setSelectedReprocessCategory("");
+    }
   };
 
   const exportAmazonFlatFile = () => {
@@ -489,11 +571,20 @@ const Index = () => {
                 <Button
                   onClick={processEverythingWithAI}
                   variant="default"
-                  disabled={isProcessingAll || isSyncing}
+                  disabled={isProcessingAll || isSyncing || isReprocessing}
                   size="lg"
                 >
                   <Sparkles className={`mr-2 h-5 w-5 ${isProcessingAll ? 'animate-pulse' : ''}`} />
                   {isProcessingAll ? 'Procesando con IA...' : 'Procesar con IA'}
+                </Button>
+                <Button
+                  onClick={() => setIsReprocessDialogOpen(true)}
+                  variant="secondary"
+                  disabled={isProcessingAll || isSyncing || isReprocessing}
+                  size="lg"
+                >
+                  <RotateCcw className={`mr-2 h-5 w-5 ${isReprocessing ? 'animate-spin' : ''}`} />
+                  {isReprocessing ? 'Reprocesando...' : 'Reprocesar Categoría'}
                 </Button>
                 <Button
                   onClick={exportSelected}
@@ -537,6 +628,52 @@ const Index = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Dialog para reprocesar categoría */}
+        <Dialog open={isReprocessDialogOpen} onOpenChange={setIsReprocessDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Reprocesar Categoría Completa</DialogTitle>
+              <DialogDescription>
+                Selecciona una categoría para reprocesar todos sus productos con las últimas traducciones y configuraciones de IA.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="py-4">
+              <Select value={selectedReprocessCategory} onValueChange={setSelectedReprocessCategory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona una categoría" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableCategories.map((category) => (
+                    <SelectItem key={category} value={category}>
+                      {category}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsReprocessDialogOpen(false);
+                  setSelectedReprocessCategory("");
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={reprocessCategory}
+                disabled={!selectedReprocessCategory}
+              >
+                <RotateCcw className="mr-2 h-4 w-4" />
+                Reprocesar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
