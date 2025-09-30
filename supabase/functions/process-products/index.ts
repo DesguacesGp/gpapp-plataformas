@@ -33,7 +33,8 @@ const DICTIONARY = {
   'CONV': 'Convexo',
   'ASF': 'Asférico',
   'REB': 'Abatible',
-  'C/CONF': 'Confort'
+  'C/CONF': 'Confort',
+  'FAROLIM': 'Piloto'
 }
 
 Deno.serve(async (req) => {
