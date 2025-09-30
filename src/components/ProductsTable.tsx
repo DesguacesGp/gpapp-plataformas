@@ -249,7 +249,7 @@ export const ProductsTable = ({
                 <SortButton field="description">Descripción</SortButton>
               </TableHead>
               <TableHead>
-                <SortButton field="ai_processed">Procesado IA</SortButton>
+                <SortButton field="ai_processed">Título Traducido</SortButton>
               </TableHead>
               <TableHead className="font-semibold">Bullet Points</TableHead>
               <TableHead className="text-center">
