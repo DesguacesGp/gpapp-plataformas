@@ -274,6 +274,87 @@ const Index = () => {
     toast.success(`${selectedIds.length} productos exportados`);
   };
 
+  const exportAmazonFlatFile = () => {
+    if (selectedIds.length === 0) {
+      toast.warning('Selecciona al menos un producto para exportar');
+      return;
+    }
+
+    const selectedProducts = products.filter(p => selectedIds.includes(p.id));
+    
+    // Generate Amazon flat file data
+    const amazonData = selectedProducts.map(product => {
+      // Generate keywords from title and description
+      const keywords = [
+        product.category,
+        'recambio',
+        'compatible',
+        'OEM',
+        'aftermarket',
+        'calidad'
+      ].filter(Boolean).join(', ');
+
+      return {
+        sku: product.sku,
+        'product-id': '',
+        'product-id-type': '',
+        brand_name: 'Recambify',
+        item_name: product.translated_title || product.description,
+        external_product_id: '',
+        recommended_browse_node: '2425091031',
+        quantity: product.stock,
+        standard_price: (product.final_price || product.price).toFixed(2),
+        condition_type: 'new',
+        bullet_point1: product.bullet_points?.[0] || '',
+        bullet_point2: product.bullet_points?.[1] || '',
+        bullet_point3: product.bullet_points?.[2] || '',
+        bullet_point4: product.bullet_points?.[3] || '',
+        bullet_point5: product.bullet_points?.[4] || '',
+        generic_keywords: keywords,
+        main_image_url: '',
+        other_image_url1: '',
+        other_image_url2: '',
+        other_image_url3: '',
+        other_image_url4: '',
+        other_image_url5: '',
+        part_number: product.sku,
+        compatible_vehicle: product.category || '',
+        gpsr_mandatory_attributes: 'EU Declaration of Conformity Available'
+      };
+    });
+
+    // Generate CSV with tab delimiters (Amazon format)
+    const headers = [
+      'sku', 'product-id', 'product-id-type', 'brand_name', 'item_name',
+      'external_product_id', 'recommended_browse_node', 'quantity', 'standard_price',
+      'condition_type', 'bullet_point1', 'bullet_point2', 'bullet_point3',
+      'bullet_point4', 'bullet_point5', 'generic_keywords', 'main_image_url',
+      'other_image_url1', 'other_image_url2', 'other_image_url3', 'other_image_url4',
+      'other_image_url5', 'part_number', 'compatible_vehicle', 'gpsr_mandatory_attributes'
+    ];
+
+    const csvContent = [
+      headers.join('\t'),
+      ...amazonData.map(row => 
+        headers.map(header => {
+          const value = row[header as keyof typeof row]?.toString() || '';
+          return value.replace(/\t/g, ' ').replace(/\n/g, ' ');
+        }).join('\t')
+      )
+    ].join('\n');
+
+    // Add BOM for proper UTF-8 encoding
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + csvContent], { type: 'text/tab-separated-values;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `amazon-vehicle-light-${new Date().toISOString().split('T')[0]}.txt`;
+    a.click();
+
+    toast.success(`Flat file Amazon generado: ${selectedIds.length} productos`);
+  };
+
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
@@ -418,7 +499,16 @@ const Index = () => {
                   disabled={selectedIds.length === 0}
                 >
                   <Download className="mr-2 h-4 w-4" />
-                  Exportar
+                  Exportar CSV
+                </Button>
+                <Button
+                  onClick={exportAmazonFlatFile}
+                  variant="default"
+                  disabled={selectedIds.length === 0}
+                  className="bg-orange-600 hover:bg-orange-700 text-white border-orange-600"
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Amazon Flat File
                 </Button>
                 <Button
                   onClick={syncFromVauner}
