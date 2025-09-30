@@ -262,8 +262,8 @@ Stock: ${product.stock}`
           processedCount.success++
         }
 
-        // Add delay to respect rate limits (5000ms between requests)
-        await new Promise(resolve => setTimeout(resolve, 5000))
+        // Add delay to respect rate limits (2500ms between requests)
+        await new Promise(resolve => setTimeout(resolve, 2500))
 
       } catch (error) {
         console.error(`Error processing product ${product.sku}:`, error)
