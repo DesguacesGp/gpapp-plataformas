@@ -308,32 +308,61 @@ const Index = () => {
     setIsReprocessDialogOpen(false);
 
     try {
-      // Get all product IDs from the selected category
-      const { data: categoryProducts, error: fetchError } = await supabase
+      // Get total count of products in the category
+      const { count: totalCount } = await supabase
         .from('vauner_products')
-        .select('id')
+        .select('id', { count: 'exact', head: true })
         .eq('category', selectedReprocessCategory);
 
-      if (fetchError) throw fetchError;
-
-      if (!categoryProducts || categoryProducts.length === 0) {
+      if (!totalCount || totalCount === 0) {
         toast.warning(`No hay productos en la categoría "${selectedReprocessCategory}"`);
         setIsReprocessing(false);
         return;
       }
 
-      const productIds = categoryProducts.map(p => p.id);
-      
-      toast.info(`🔄 Iniciando reprocesamiento de ${productIds.length} productos de "${selectedReprocessCategory}"...`);
+      toast.info(`🔄 Iniciando reprocesamiento de ${totalCount} productos de "${selectedReprocessCategory}" en lotes...`);
 
-      // Call the process-products edge function
-      const { data, error } = await supabase.functions.invoke('process-products', {
-        body: { productIds }
-      });
+      const batchSize = 20; // Process 20 products at a time
+      let processedTotal = 0;
+      let failedTotal = 0;
 
-      if (error) throw error;
+      // Process in batches
+      for (let offset = 0; offset < totalCount; offset += batchSize) {
+        // Get batch of product IDs
+        const { data: batchProducts, error: fetchError } = await supabase
+          .from('vauner_products')
+          .select('id')
+          .eq('category', selectedReprocessCategory)
+          .range(offset, offset + batchSize - 1);
 
-      toast.success(`✅ ${data.message || 'Reprocesamiento completado'}`);
+        if (fetchError) throw fetchError;
+
+        if (!batchProducts || batchProducts.length === 0) continue;
+
+        const productIds = batchProducts.map(p => p.id);
+
+        toast.info(`📦 Procesando lote ${Math.floor(offset / batchSize) + 1} de ${Math.ceil(totalCount / batchSize)} (${processedTotal}/${totalCount} completados)...`);
+
+        // Call the process-products edge function
+        const { data, error } = await supabase.functions.invoke('process-products', {
+          body: { productIds }
+        });
+
+        if (error) {
+          console.error(`Error processing batch at offset ${offset}:`, error);
+          failedTotal += productIds.length;
+          // Continue with next batch even if this one fails
+          continue;
+        }
+
+        processedTotal += data.processed || 0;
+        failedTotal += data.failed || 0;
+
+        // Short delay between batches to avoid rate limits
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
+      toast.success(`✅ Reprocesamiento completado: ${processedTotal} exitosos, ${failedTotal} fallidos de ${totalCount} totales`);
       loadProducts();
     } catch (error: any) {
       console.error('Error reprocessing category:', error);
