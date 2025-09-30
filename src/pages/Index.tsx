@@ -319,7 +319,12 @@ const Index = () => {
         other_image_url5: '',
         part_number: product.sku,
         compatible_vehicle: product.category || '',
-        gpsr_mandatory_attributes: 'EU Declaration of Conformity Available'
+        gpsr_mandatory_attributes: 'EU Declaration of Conformity Available',
+        manufacturer: 'INNOVA RECAMBIOS SL',
+        importer: 'INNOVA RECAMBIOS SL, CIF B06720221, AVDA FEDERICO MAYOR ZARAGOZA NAVE 8, 06006 Badajoz, Tel: 924114454',
+        country_of_origin: 'Spain',
+        ce_compliance: 'No',
+        safety_warnings: 'Ninguno'
       };
     });
 
@@ -330,7 +335,8 @@ const Index = () => {
       'condition_type', 'bullet_point1', 'bullet_point2', 'bullet_point3',
       'bullet_point4', 'bullet_point5', 'generic_keywords', 'main_image_url',
       'other_image_url1', 'other_image_url2', 'other_image_url3', 'other_image_url4',
-      'other_image_url5', 'part_number', 'compatible_vehicle', 'gpsr_mandatory_attributes'
+      'other_image_url5', 'part_number', 'compatible_vehicle', 'gpsr_mandatory_attributes',
+      'manufacturer', 'importer', 'country_of_origin', 'ce_compliance', 'safety_warnings'
     ];
 
     const csvContent = [
