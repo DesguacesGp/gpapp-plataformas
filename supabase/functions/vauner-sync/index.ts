@@ -228,11 +228,56 @@ Deno.serve(async (req) => {
           )
         }
 
+        // Step 4: Automatically process unprocessed products with AI
+        console.log('Checking for unprocessed products...')
+        const { data: unprocessedProducts, error: unprocessedError } = await supabaseClient
+          .from('vauner_products')
+          .select('id')
+          .is('translated_title', null)
+          .limit(100) // Process up to 100 products at a time
+        
+        if (unprocessedError) {
+          console.error('Error fetching unprocessed products:', unprocessedError)
+        } else if (unprocessedProducts && unprocessedProducts.length > 0) {
+          console.log(`Found ${unprocessedProducts.length} unprocessed products, starting AI processing...`)
+          
+          // Invoke process-products function asynchronously
+          const productIds = unprocessedProducts.map(p => p.id)
+          
+          // Call process-products function (don't await, let it run in background)
+          fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/process-products`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ productIds })
+          }).then(response => {
+            if (response.ok) {
+              console.log('AI processing started successfully')
+            } else {
+              console.error('Failed to start AI processing:', response.status)
+            }
+          }).catch(err => {
+            console.error('Error calling process-products:', err)
+          })
+          
+          return new Response(
+            JSON.stringify({ 
+              success: true, 
+              productsCount: allProducts.length,
+              unprocessedCount: unprocessedProducts.length,
+              message: `${allProducts.length} productos sincronizados. Procesando ${unprocessedProducts.length} productos nuevos con IA automáticamente...` 
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
         return new Response(
           JSON.stringify({ 
             success: true, 
             productsCount: allProducts.length,
-            message: `${allProducts.length} productos con imágenes sincronizados correctamente` 
+            message: `${allProducts.length} productos sincronizados. Todos los productos ya están procesados.` 
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
