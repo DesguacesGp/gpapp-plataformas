@@ -31,6 +31,85 @@ Deno.serve(async (req) => {
 
     console.log('Vauner sync request:', { action, categories })
 
+    // Handle resume_processing action
+    if (action === 'resume_processing') {
+      console.log('Resuming AI processing for unprocessed products...')
+      
+      const { count: unprocessedCount } = await supabaseClient
+        .from('vauner_products')
+        .select('*', { count: 'exact', head: true })
+        .is('translated_title', null)
+      
+      console.log(`Found ${unprocessedCount || 0} total unprocessed products`)
+      
+      if (!unprocessedCount || unprocessedCount === 0) {
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            message: 'No hay productos pendientes de procesar' 
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      
+      // Process in batches of 25
+      const batchSize = 25
+      let processed = 0
+      
+      const processNextBatch = async () => {
+        const { data: batch, error: batchError } = await supabaseClient
+          .from('vauner_products')
+          .select('id')
+          .is('translated_title', null)
+          .limit(batchSize)
+        
+        if (batchError || !batch || batch.length === 0) {
+          console.log(`Processing complete. Total processed: ${processed}`)
+          return
+        }
+        
+        const productIds = batch.map(p => p.id)
+        
+        // Trigger processing for this batch
+        fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/process-products`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ productIds })
+        }).then(response => {
+          if (response.ok) {
+            processed += batch.length
+            console.log(`Batch processed successfully. Total: ${processed}/${unprocessedCount}`)
+          } else {
+            console.error('Failed to process batch:', response.status)
+          }
+        }).catch(err => {
+          console.error('Error processing batch:', err)
+        })
+        
+        // 10 second delay between batches
+        await new Promise(resolve => setTimeout(resolve, 10000))
+        
+        await processNextBatch()
+      }
+      
+      // Start processing loop in background
+      processNextBatch().catch(err => {
+        console.error('Error in processing loop:', err)
+      })
+      
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          unprocessedCount,
+          message: `Procesamiento IA reanudado para ${unprocessedCount} productos pendientes` 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     // Get Vauner credentials from config table
     const { data: configData, error: configError } = await supabaseClient
       .from('vauner_config')

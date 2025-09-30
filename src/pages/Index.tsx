@@ -27,6 +27,7 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isResuming, setIsResuming] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   
   // Pagination and filters
@@ -222,6 +223,25 @@ const Index = () => {
     }
   };
 
+  const resumeProcessing = async () => {
+    setIsResuming(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('vauner-sync', {
+        body: { action: 'resume_processing' }
+      });
+
+      if (error) throw error;
+
+      toast.success(data.message || 'Procesamiento IA reanudado');
+      loadProducts();
+    } catch (error: any) {
+      console.error('Error resuming processing:', error);
+      toast.error('Error al reanudar procesamiento: ' + error.message);
+    } finally {
+      setIsResuming(false);
+    }
+  };
+
   const exportSelected = () => {
     if (selectedIds.length === 0) {
       toast.warning('Selecciona al menos un producto para exportar');
@@ -377,12 +397,20 @@ const Index = () => {
               </div>
               <div className="flex gap-2">
                 <Button
+                  onClick={resumeProcessing}
+                  variant="default"
+                  disabled={isResuming || processedProducts >= totalWithImages}
+                >
+                  <Sparkles className={`mr-2 h-4 w-4 ${isResuming ? 'animate-pulse' : ''}`} />
+                  {isResuming ? 'Reanudando...' : 'Reanudar IA'}
+                </Button>
+                <Button
                   onClick={processProducts}
                   variant="secondary"
                   disabled={selectedIds.length === 0 || isProcessing}
                 >
                   <Sparkles className={`mr-2 h-4 w-4 ${isProcessing ? 'animate-pulse' : ''}`} />
-                  {isProcessing ? 'Procesando...' : 'Procesar con IA'}
+                  {isProcessing ? 'Procesando...' : 'Procesar Selección'}
                 </Button>
                 <Button
                   onClick={exportSelected}
