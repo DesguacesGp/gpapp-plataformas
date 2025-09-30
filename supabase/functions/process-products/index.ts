@@ -72,8 +72,20 @@ Deno.serve(async (req) => {
         
         // Apply dictionary replacements
         let translatedDesc = product.description
-        for (const [key, value] of Object.entries(DICTIONARY)) {
-          // Escape special regex characters in the key
+        
+        // First, handle entries with special characters that need exact matching
+        const specialCharsEntries = Object.entries(DICTIONARY).filter(([key]) => /[\/\*\.]/.test(key))
+        const normalEntries = Object.entries(DICTIONARY).filter(([key]) => !/[\/\*\.]/.test(key))
+        
+        // Apply special character replacements first (without word boundaries)
+        for (const [key, value] of specialCharsEntries) {
+          const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+          const regex = new RegExp(escapedKey, 'gi')
+          translatedDesc = translatedDesc.replace(regex, value)
+        }
+        
+        // Then apply normal replacements with word boundaries
+        for (const [key, value] of normalEntries) {
           const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
           const regex = new RegExp(`\\b${escapedKey}\\b`, 'gi')
           translatedDesc = translatedDesc.replace(regex, value)
