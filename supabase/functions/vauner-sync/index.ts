@@ -100,12 +100,32 @@ Deno.serve(async (req) => {
           throw new Error('Categories fetch not authorized')
         }
         
-        // Step 3: Fetch products for specific categories only
+        // Step 3: Get enabled categories from database
+        const { data: enabledCategories, error: categoriesError } = await supabaseClient
+          .from('category_config')
+          .select('category_code, category_name')
+          .eq('enabled', true)
+        
+        if (categoriesError) {
+          console.error('Error fetching enabled categories:', categoriesError)
+          throw categoriesError
+        }
+        
+        if (!enabledCategories || enabledCategories.length === 0) {
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              message: 'No hay categorías habilitadas. Por favor, configura las categorías en Ajustes.' 
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+        
         const allProducts: VaunerProduct[] = []
         const availableCategories = categoriesData.detail || []
         
-        // Only fetch products for categories 106, 105, 103
-        const targetCategoryIds = ['106', '105', '103']
+        // Fetch products only for enabled categories from database
+        const targetCategoryIds = enabledCategories.map(c => c.category_code)
         const categoriesToFetch = availableCategories.filter((cat: any) => 
           targetCategoryIds.includes(cat.CODIGO)
         )
@@ -228,46 +248,74 @@ Deno.serve(async (req) => {
           )
         }
 
-        // Step 4: Automatically process unprocessed products with AI
-        console.log('Checking for unprocessed products...')
-        const { data: unprocessedProducts, error: unprocessedError } = await supabaseClient
-          .from('vauner_products')
-          .select('id')
-          .is('translated_title', null)
-          .limit(100) // Process up to 100 products at a time
+        // Step 4: Trigger continuous AI processing for ALL unprocessed products
+        console.log('Starting continuous AI processing for all unprocessed products...')
         
-        if (unprocessedError) {
-          console.error('Error fetching unprocessed products:', unprocessedError)
-        } else if (unprocessedProducts && unprocessedProducts.length > 0) {
-          console.log(`Found ${unprocessedProducts.length} unprocessed products, starting AI processing...`)
+        // Get count of unprocessed products
+        const { count: unprocessedCount } = await supabaseClient
+          .from('vauner_products')
+          .select('*', { count: 'exact', head: true })
+          .is('translated_title', null)
+        
+        console.log(`Found ${unprocessedCount || 0} total unprocessed products`)
+        
+        if (unprocessedCount && unprocessedCount > 0) {
+          // Process in batches of 50 to avoid overwhelming the system
+          const batchSize = 50
+          let processed = 0
           
-          // Invoke process-products function asynchronously
-          const productIds = unprocessedProducts.map(p => p.id)
-          
-          // Call process-products function (don't await, let it run in background)
-          fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/process-products`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ productIds })
-          }).then(response => {
-            if (response.ok) {
-              console.log('AI processing started successfully')
-            } else {
-              console.error('Failed to start AI processing:', response.status)
+          // Start processing loop (will continue until all products are processed)
+          const processNextBatch = async () => {
+            const { data: batch, error: batchError } = await supabaseClient
+              .from('vauner_products')
+              .select('id')
+              .is('translated_title', null)
+              .limit(batchSize)
+            
+            if (batchError || !batch || batch.length === 0) {
+              console.log(`Processing complete. Total processed: ${processed}`)
+              return
             }
-          }).catch(err => {
-            console.error('Error calling process-products:', err)
+            
+            const productIds = batch.map(p => p.id)
+            
+            // Trigger processing for this batch (don't await to allow parallel processing)
+            fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/process-products`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ productIds })
+            }).then(response => {
+              if (response.ok) {
+                processed += batch.length
+                console.log(`Batch processed successfully. Total: ${processed}/${unprocessedCount}`)
+              } else {
+                console.error('Failed to process batch:', response.status)
+              }
+            }).catch(err => {
+              console.error('Error processing batch:', err)
+            })
+            
+            // Small delay between batches to avoid rate limits
+            await new Promise(resolve => setTimeout(resolve, 2000))
+            
+            // Continue processing next batch
+            await processNextBatch()
+          }
+          
+          // Start the processing loop (don't await, let it run in background)
+          processNextBatch().catch(err => {
+            console.error('Error in processing loop:', err)
           })
           
           return new Response(
             JSON.stringify({ 
               success: true, 
               productsCount: allProducts.length,
-              unprocessedCount: unprocessedProducts.length,
-              message: `${allProducts.length} productos sincronizados. Procesando ${unprocessedProducts.length} productos nuevos con IA automáticamente...` 
+              unprocessedCount,
+              message: `${allProducts.length} productos sincronizados. Procesamiento IA iniciado para ${unprocessedCount} productos...` 
             }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
@@ -277,7 +325,7 @@ Deno.serve(async (req) => {
           JSON.stringify({ 
             success: true, 
             productsCount: allProducts.length,
-            message: `${allProducts.length} productos sincronizados. Todos los productos ya están procesados.` 
+            message: `${allProducts.length} productos sincronizados. Todos los productos están procesados.` 
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )

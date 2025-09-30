@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      category_config: {
+        Row: {
+          category_code: string
+          category_name: string
+          created_at: string
+          enabled: boolean
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          category_code: string
+          category_name: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          category_code?: string
+          category_name?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pricing_config: {
         Row: {
           category: string

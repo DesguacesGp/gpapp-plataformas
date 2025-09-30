@@ -33,7 +33,7 @@ const Index = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalProducts, setTotalProducts] = useState(0);
   const [totalWithImages, setTotalWithImages] = useState(0);
-  const [totalValue, setTotalValue] = useState(0);
+  const [processedProducts, setProcessedProducts] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [sortField, setSortField] = useState<string>("ai_processed");
@@ -88,13 +88,13 @@ const Index = () => {
       
       setTotalWithImages(withImagesCount || 0);
 
-      // Get total value (price * stock for all products)
-      const { data: allProducts } = await supabase
+      // Get count of processed products (those with translated_title)
+      const { count: processedCount } = await supabase
         .from('vauner_products')
-        .select('price, stock');
-      
-      const totalVal = (allProducts || []).reduce((sum, p) => sum + (p.price * p.stock), 0);
-      setTotalValue(totalVal);
+        .select('*', { count: 'exact', head: true })
+        .not('translated_title', 'is', null);
+
+      setProcessedProducts(processedCount || 0);
 
       // Apply pagination
       const from = (currentPage - 1) * productsPerPage;
@@ -315,7 +315,7 @@ const Index = () => {
               <Button variant="outline" size="icon" onClick={() => navigate("/pricing")}>
                 <DollarSign className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="icon">
+              <Button variant="outline" size="icon" onClick={() => navigate("/settings")}>
                 <Settings className="h-4 w-4" />
               </Button>
               <Button variant="outline" size="icon" onClick={handleLogout}>
@@ -351,12 +351,17 @@ const Index = () => {
 
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Valor Total</CardTitle>
+              <CardTitle className="text-sm font-medium">Productos IA</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">
-                €{totalValue.toFixed(2)}
+                {processedProducts} / {totalWithImages}
               </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {totalWithImages > 0 
+                  ? `${Math.round((processedProducts / totalWithImages) * 100)}% procesados`
+                  : 'Sin productos'}
+              </p>
             </CardContent>
           </Card>
         </div>
