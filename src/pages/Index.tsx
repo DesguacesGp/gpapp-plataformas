@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { RefreshCw, Settings, Download, LogOut, Sparkles, DollarSign, Database } from "lucide-react";
+import { RefreshCw, Settings, Download, LogOut, Sparkles, DollarSign } from "lucide-react";
 import { ProductsTable } from "@/components/ProductsTable";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -31,8 +31,7 @@ const Index = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [isResuming, setIsResuming] = useState(false);
-  const [isExtracting, setIsExtracting] = useState(false);
+  const [isProcessingAll, setIsProcessingAll] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   
   // Pagination and filters
@@ -168,38 +167,13 @@ const Index = () => {
   const syncFromVauner = async () => {
     setIsSyncing(true);
     try {
-      // First, ensure config is set
-      const { data: existingConfig } = await supabase
-        .from('vauner_config')
-        .select('*')
-        .limit(1);
-
-      if (!existingConfig || existingConfig.length === 0) {
-        // Insert default config from the image
-        await supabase.from('vauner_config').upsert([
-          { config_key: 'vauner_url', config_value: 'https://www.vauner.pt' },
-          { config_key: 'vauner_user', config_value: 'innova' },
-          { config_key: 'vauner_password', config_value: '89063145' },
-          { config_key: 'vauner_guid', config_value: '7mv9iom5mc5d0cd0u3h3iafbe7' },
-        ]);
-      }
-
       const { data, error } = await supabase.functions.invoke('vauner-sync', {
-        body: {
-          action: 'sync_products',
-          categories: ['Iluminación', 'Espejos', 'Carrocería']
-        }
+        body: { action: 'fetch' }
       });
 
       if (error) throw error;
 
-      toast.success(data.message || 'Productos sincronizados correctamente');
-      
-      // Automatically start processing after sync
-      toast.info('Iniciando procesamiento automático de IA...');
-      setTimeout(() => {
-        resumeProcessing();
-      }, 2000);
+      toast.success(`✅ Sincronización completada: ${data.stats.inserted} productos nuevos`);
       
       loadProducts();
     } catch (error: any) {
@@ -210,60 +184,63 @@ const Index = () => {
     }
   };
 
-
-  const resumeProcessing = async (autoLoop: boolean = true) => {
-    setIsResuming(true);
+  // Función unificada que hace todo el proceso de IA automáticamente
+  const processEverythingWithAI = async () => {
+    setIsProcessingAll(true);
+    
     try {
-      const { data, error } = await supabase.functions.invoke('vauner-sync', {
-        body: { action: 'resume_processing' }
+      // Paso 1: Sincronizar con Vauner
+      toast.info('🔄 Paso 1/3: Sincronizando productos desde Vauner...');
+      const { data: syncData, error: syncError } = await supabase.functions.invoke('vauner-sync', {
+        body: { action: 'fetch' }
       });
 
-      if (error) throw error;
+      if (syncError) throw syncError;
+      toast.success(`✅ ${syncData.stats.inserted} productos nuevos sincronizados`);
 
-      toast.success(data.message || 'Procesamiento IA reanudado');
+      // Paso 2: Procesar títulos y bullet points con IA (loop automático)
+      toast.info('🤖 Paso 2/3: Generando títulos y bullets con IA...');
+      await processAILoop();
       
-      // Continue processing if there are more products and autoLoop is enabled
-      if (autoLoop && data.unprocessed && data.unprocessed > 0) {
-        toast.info(`Quedan ${data.unprocessed} productos por procesar, continuando...`);
-        setTimeout(() => {
-          resumeProcessing(true);
-        }, 5000);
-      } else {
-        loadProducts();
-        setIsResuming(false);
-      }
+      // Paso 3: Extraer información de productos (loop automático)
+      toast.info('📊 Paso 3/3: Extrayendo información de productos...');
+      await extractInfoLoop();
+
+      toast.success('🎉 ¡Proceso completo! Todos los productos han sido procesados con IA');
+      loadProducts();
     } catch (error: any) {
-      console.error('Error resuming processing:', error);
-      toast.error('Error al reanudar procesamiento: ' + error.message);
-      setIsResuming(false);
+      console.error('Error in full AI process:', error);
+      toast.error('Error en el proceso: ' + error.message);
+    } finally {
+      setIsProcessingAll(false);
     }
   };
 
-  const extractProductInfo = async (autoLoop: boolean = true) => {
-    if (!autoLoop) setIsExtracting(true);
+  // Loop para procesamiento de IA (títulos y bullets)
+  const processAILoop = async (): Promise<void> => {
+    const { data, error } = await supabase.functions.invoke('vauner-sync', {
+      body: { action: 'resume_processing' }
+    });
+
+    if (error) throw error;
+
+    // Si hay más productos por procesar, continuar
+    if (data.unprocessed && data.unprocessed > 0) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      return processAILoop();
+    }
+  };
+
+  // Loop para extracción de información
+  const extractInfoLoop = async (): Promise<void> => {
+    const { data, error } = await supabase.functions.invoke('extract-product-info');
     
-    try {
-      const { data, error } = await supabase.functions.invoke('extract-product-info');
-      
-      if (error) throw error;
-      
-      console.log(`Extraídos ${data.processed} productos. Quedan: ${data.remaining}`);
-      
-      // Continue extracting if there are more products and autoLoop is enabled
-      if (autoLoop && data.hasMore) {
-        // Don't show toast for every iteration, just log
-        setTimeout(() => {
-          extractProductInfo(true);
-        }, 2000);
-      } else {
-        toast.success(`Extracción completada: ${data.processed} productos procesados`);
-        loadProducts();
-        setIsExtracting(false);
-      }
-    } catch (error: any) {
-      console.error('Error extracting product info:', error);
-      toast.error('Error al extraer información: ' + error.message);
-      setIsExtracting(false);
+    if (error) throw error;
+
+    // Si hay más productos por procesar, continuar
+    if (data.hasMore) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      return extractInfoLoop();
     }
   };
 
@@ -510,24 +487,13 @@ const Index = () => {
               </div>
               <div className="flex gap-2 flex-wrap">
                 <Button
-                  onClick={() => {
-                    resumeProcessing(true);
-                    extractProductInfo(true);
-                    toast.success('🚀 Procesamiento automático iniciado en paralelo');
-                  }}
+                  onClick={processEverythingWithAI}
                   variant="default"
-                  disabled={isResuming || isExtracting}
+                  disabled={isProcessingAll || isSyncing}
+                  size="lg"
                 >
-                  <Sparkles className={`mr-2 h-4 w-4 ${(isResuming || isExtracting) ? 'animate-pulse' : ''}`} />
-                  {(isResuming || isExtracting) ? 'Procesando Todo...' : 'Procesar Todo (Automático)'}
-                </Button>
-                <Button
-                  onClick={() => extractProductInfo(false)}
-                  variant="secondary"
-                  disabled={isExtracting}
-                >
-                  <Database className={`mr-2 h-4 w-4 ${isExtracting ? 'animate-pulse' : ''}`} />
-                  {isExtracting ? 'Extrayendo...' : 'Extraer Info (Manual)'}
+                  <Sparkles className={`mr-2 h-5 w-5 ${isProcessingAll ? 'animate-pulse' : ''}`} />
+                  {isProcessingAll ? 'Procesando con IA...' : 'Procesar Todo con IA'}
                 </Button>
                 <Button
                   onClick={exportSelected}
@@ -545,13 +511,6 @@ const Index = () => {
                 >
                   <Download className="mr-2 h-4 w-4" />
                   Amazon Flat File
-                </Button>
-                <Button
-                  onClick={syncFromVauner}
-                  disabled={isSyncing}
-                >
-                  <RefreshCw className={`mr-2 h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
-                  Actualizar desde Vauner
                 </Button>
               </div>
             </div>
