@@ -236,6 +236,7 @@ export type Database = {
       vehicle_models: {
         Row: {
           año_desde: string
+          año_hasta: string | null
           created_at: string
           gama: string
           id: string
@@ -246,6 +247,7 @@ export type Database = {
         }
         Insert: {
           año_desde: string
+          año_hasta?: string | null
           created_at?: string
           gama: string
           id?: string
@@ -256,6 +258,7 @@ export type Database = {
         }
         Update: {
           año_desde?: string
+          año_hasta?: string | null
           created_at?: string
           gama?: string
           id?: string
