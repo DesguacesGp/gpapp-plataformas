@@ -32,6 +32,8 @@ const Index = () => {
   // Pagination and filters
   const [currentPage, setCurrentPage] = useState(1);
   const [totalProducts, setTotalProducts] = useState(0);
+  const [totalWithImages, setTotalWithImages] = useState(0);
+  const [totalValue, setTotalValue] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [sortField, setSortField] = useState<string>("ai_processed");
@@ -77,6 +79,22 @@ const Index = () => {
       // Get total count for pagination
       const { count } = await query;
       setTotalProducts(count || 0);
+
+      // Get global KPIs (independent of pagination/filters)
+      const { count: withImagesCount } = await supabase
+        .from('vauner_products')
+        .select('*', { count: 'exact', head: true })
+        .eq('has_image', true);
+      
+      setTotalWithImages(withImagesCount || 0);
+
+      // Get total value (price * stock for all products)
+      const { data: allProducts } = await supabase
+        .from('vauner_products')
+        .select('price, stock');
+      
+      const totalVal = (allProducts || []).reduce((sum, p) => sum + (p.price * p.stock), 0);
+      setTotalValue(totalVal);
 
       // Apply pagination
       const from = (currentPage - 1) * productsPerPage;
@@ -326,7 +344,7 @@ const Index = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">
-                {products.filter(p => p.has_image).length}
+                {totalWithImages}
               </div>
             </CardContent>
           </Card>
@@ -337,7 +355,7 @@ const Index = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">
-                €{products.reduce((sum, p) => sum + (p.price * p.stock), 0).toFixed(2)}
+                €{totalValue.toFixed(2)}
               </div>
             </CardContent>
           </Card>
