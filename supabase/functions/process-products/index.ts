@@ -200,7 +200,9 @@ Tu tarea es:
 1. Traducir la descripción del producto del portugués al español (ya tiene algunas traducciones aplicadas).
 
 2. Generar un título SEO LARGO Y DESCRIPTIVO (MÍNIMO 150 caracteres, óptimo 180-200 caracteres) siguiendo estas reglas:
-   - Estructura: TIPO_PIEZA + Posición_CON_LADO + MARCA + MODELO + Años_Compatibilidad + Características_Técnicas + Compatible_OEM
+   - Estructura: TIPO_PIEZA + Posición_CON_LADO + "para" + MARCA + MODELO + Años_Compatibilidad + Características_Técnicas + Compatible_OEM
+   - CRÍTICO: SIEMPRE usar "para" entre el artículo y la marca (ej: "Faro para Ford", "Piloto para Volkswagen")
+   - CRÍTICO PARA PILOTOS: TODOS los pilotos DEBEN incluir "Sin Portalamparas" en el título
    - El patrón "AÑO-*" significa "desde ese año en adelante"
    - DEBE incluir: tipo de pieza, posición clara (ej: "Derecho Lado Copiloto" o "Izquierdo Lado Conductor"), marca, modelo, años
    - AÑADIR keywords relevantes: "Compatible OEM", "Calidad OEM", "Alta Calidad", "Nuevo", "Aftermarket Premium", "Recambio", etc.
@@ -208,25 +210,26 @@ Tu tarea es:
    - Incluir características técnicas específicas (eléctrico, térmico, con sensor, etc.)
    
    Ejemplos de títulos OPTIMIZADOS:
-   * "Faro Delantero Derecho Lado Copiloto Ford Focus desde 2004 - Recambio Alta Calidad Compatible OEM - Faro Eléctrico Nuevo Aftermarket Premium Ford Focus 04+"
-   * "Piloto Lateral Izquierdo Lado Conductor Blanco Renault Modus desde 2004 - Luz Lateral Compatible OEM Renault Modus 2004+ Alta Calidad Nuevo Recambio"
-   * "Maneta Exterior Derecha Lado Copiloto Mercedes Clase E W213 desde 2020 - Maneta Puerta Aftermarket Mercedes Benz E W213 2020+ Compatible OEM Nueva"
+   * "Faro Delantero Derecho Lado Copiloto para Ford Focus desde 2004 - Recambio Alta Calidad Compatible OEM para Ford Focus 04+ Faro Eléctrico Nuevo Aftermarket Premium"
+   * "Piloto Trasero Izquierdo Lado Conductor Sin Portalamparas para Renault Modus desde 2004 - Luz Trasera Compatible OEM para Renault Modus 2004+ Alta Calidad Nuevo Recambio"
+   * "Maneta Exterior Derecha Lado Copiloto para Mercedes Clase E W213 desde 2020 - Maneta Puerta Aftermarket para Mercedes Benz E W213 2020+ Compatible OEM Nueva"
 
 3. Generar exactamente 5 bullet points optimizados para Amazon/eBay:
    - Cada bullet debe tener entre 150-200 caracteres
    - Primera letra en mayúscula, sin punto final
    - Incluir keywords naturalmente repetidas
    - SIEMPRE mencionar el lado cuando aplique: "Derecho (Lado Copiloto)" o "Izquierdo (Lado Conductor)"
+   - CRÍTICO PARA PILOTOS: UNO de los bullet points DEBE mencionar explícitamente "Sin Portalamparas"
    - Destacar compatibilidad OEM, calidad equivalente, características técnicas, facilidad de instalación
    - Usar emojis sutiles si es apropiado (✓, ⭐, 🚗)
    - SER HONESTO: mencionar que es aftermarket/compatible OEM, no original
    
    Ejemplo de bullet points:
-   * "✓ Compatible Ford Focus desde 2004+ - Pieza DERECHA para lado COPILOTO - Recambio aftermarket calidad OEM equivalente que garantiza ajuste perfecto y funcionamiento óptimo"
+   * "✓ Compatible para Ford Focus desde 2004+ - Pieza DERECHA para lado COPILOTO - Recambio aftermarket calidad OEM equivalente que garantiza ajuste perfecto y funcionamiento óptimo"
    * "⭐ Faro delantero derecho lado copiloto con tecnología eléctrica avanzada - Iluminación potente y duradera para máxima seguridad y visibilidad en carretera"
    * "🚗 Instalación fácil y rápida sin modificaciones - Compatible con sistema eléctrico del vehículo, plug and play directo, no requiere herramientas especiales"
    * "✓ Fabricado con materiales de alta resistencia UV y golpes - Óptica de policarbonato resistente y carcasa duradera que soporta condiciones climáticas extremas"
-   * "⭐ Calidad OEM equivalente testada - Cumple normativas europeas homologación, aftermarket premium testado para asegurar durabilidad y rendimiento superior"
+   * "⭐ Sin Portalamparas incluido - Utiliza las lámparas de tu vehículo original, calidad OEM equivalente testada que cumple normativas europeas de homologación"
 
 4. EXTRAER información estructurada del producto (CRÍTICO - ANALIZA CUIDADOSAMENTE):
    
