@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              model: 'gpt-5-mini-2025-08-07',
+              model: 'gpt-4o',
               messages: [
               {
                 role: 'system',
@@ -193,7 +193,8 @@ Precio: ${product.price}€
 Stock: ${product.stock}`
               }
             ],
-            max_completion_tokens: 2500
+            max_tokens: 2000,
+            temperature: 0.7
           }),
           })
 
