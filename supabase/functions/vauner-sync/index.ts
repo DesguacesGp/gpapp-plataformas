@@ -64,9 +64,9 @@ Deno.serve(async (req) => {
       // Get the product IDs to process
       const productIds = unprocessedProducts.map(p => p.id)
       
-      // Trigger processing for this batch
+      // Trigger processing for this batch WITHOUT waiting for response
       console.log(`Triggering process-products for ${productIds.length} products`)
-      const processResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/process-products`, {
+      fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/process-products`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
@@ -74,61 +74,23 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({ productIds })
       })
+        .then(response => {
+          if (response.ok) {
+            console.log('Process-products triggered successfully')
+          } else {
+            console.error('Failed to trigger process-products:', response.status)
+          }
+        })
+        .catch(error => {
+          console.error('Error triggering process-products:', error)
+        })
       
-      if (!processResponse.ok) {
-        const errorText = await processResponse.text()
-        console.error('Failed to process batch:', processResponse.status, errorText)
-        throw new Error(`Failed to process products: ${errorText}`)
-      }
-      
-      const processData = await processResponse.json()
-      console.log('Processing result:', processData)
-      
-      // Check if there are more products to process
-      const { count: remainingCount } = await supabaseClient
-        .from('vauner_products')
-        .select('*', { count: 'exact', head: true })
-        .is('translated_title', null)
-      
-      console.log(`Remaining unprocessed products: ${remainingCount || 0}`)
-      
-      // If there are more products, trigger another batch automatically
-      if (remainingCount && remainingCount > 0) {
-        console.log('More products to process, triggering next batch automatically...')
-        
-        // Trigger next batch in background without waiting
-        setTimeout(() => {
-          fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/vauner-sync`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ action: 'resume_processing' })
-          })
-          .then(response => {
-            if (response.ok) {
-              console.log('Next batch triggered successfully')
-            } else {
-              console.error('Failed to trigger next batch:', response.status)
-            }
-          })
-          .catch(error => {
-            console.error('Error triggering next batch:', error)
-          })
-        }, 5000) // Wait 5 seconds before next batch
-      }
-      
+      // Return immediately - processing continues in background
       return new Response(
         JSON.stringify({ 
           success: true, 
-          unprocessedCount,
-          remainingCount: remainingCount || 0,
-          message: remainingCount && remainingCount > 0 
-            ? `Procesados ${unprocessedCount} productos. Continuando automáticamente con ${remainingCount} restantes...`
-            : `Procesados ${unprocessedCount} productos. Procesamiento completado.`,
-          processed: unprocessedCount,
-          details: processData
+          message: `Iniciando procesamiento de ${unprocessedCount} productos...`,
+          processing: unprocessedCount
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )

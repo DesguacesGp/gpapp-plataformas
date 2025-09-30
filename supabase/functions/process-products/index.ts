@@ -300,12 +300,59 @@ Stock: ${product.stock}`
       }
     }
 
+    // Check if there are more products to process
+    const { count: remainingCount } = await supabaseClient
+      .from('vauner_products')
+      .select('*', { count: 'exact', head: true })
+      .is('translated_title', null)
+    
+    console.log(`Batch complete. Processed: ${processedCount.success}, Failed: ${processedCount.failed}, Remaining: ${remainingCount || 0}`)
+    
+    // If there are more products, trigger another batch automatically
+    if (remainingCount && remainingCount > 0) {
+      console.log('More products remaining, triggering next batch in 5 seconds...')
+      
+      // Get next batch of product IDs
+      const { data: nextBatch } = await supabaseClient
+        .from('vauner_products')
+        .select('id')
+        .is('translated_title', null)
+        .limit(50)
+      
+      if (nextBatch && nextBatch.length > 0) {
+        const nextProductIds = nextBatch.map(p => p.id)
+        
+        // Trigger next batch in background after delay
+        setTimeout(() => {
+          fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/process-products`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ productIds: nextProductIds })
+          })
+            .then(response => {
+              if (response.ok) {
+                console.log('Next batch triggered successfully')
+              } else {
+                console.error('Failed to trigger next batch:', response.status)
+              }
+            })
+            .catch(error => {
+              console.error('Error triggering next batch:', error)
+            })
+        }, 5000)
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Procesados ${processedCount.success} productos correctamente, ${processedCount.failed} fallidos`,
+        message: `Procesados ${processedCount.success} productos correctamente, ${processedCount.failed} fallidos. ${remainingCount || 0} pendientes.`,
         processed: processedCount.success,
-        failed: processedCount.failed
+        failed: processedCount.failed,
+        remaining: remainingCount || 0
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
