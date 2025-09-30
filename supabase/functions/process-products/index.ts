@@ -128,6 +128,11 @@ INFORMACIÓN SOBRE PLEGABILIDAD DE RETROVISORES:
 - Los retrovisores SIN "REB" son PLEGABLES MANUALMENTE
 - P/P significa "Para pintar" y NO tiene relación con plegabilidad
 
+INFORMACIÓN ESPECÍFICA PARA PILOTOS/ILUMINACIÓN:
+- TODOS los pilotos de la categoría "iluminacion" son SIN PORTALAMPARAS
+- DEBES incluir "Sin Portalamparas" tanto en el título como en uno de los bullet points
+- Esto es CRÍTICO para que el cliente sepa que debe usar las lámparas de su vehículo original
+
 Tu tarea es:
 1. Traducir la descripción del producto del portugués al español (ya tiene algunas traducciones aplicadas).
 
