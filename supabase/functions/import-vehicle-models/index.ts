@@ -24,28 +24,69 @@ serve(async (req) => {
       throw new Error('CSV data is required')
     }
 
-    // Parse CSV data (expecting semicolon-separated values)
+    // Parse CSV data - format: marca;gama;desde;hasta;id_marca;id_gama
     const lines = csvData.split('\n')
-    const headers = lines[0].split(';')
-    
     const models = []
+    
+    // Skip header row
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].trim()
       if (!line) continue
       
-      const values = line.split(';')
-      if (values.length < 5) continue
+      const values = line.split(';').map((s: string) => s.trim())
+      if (values.length < 6) continue
       
-      models.push({
-        marca: values[0]?.replace('﻿', '').trim(), // Remove BOM if present
-        gama: values[1]?.trim(),
-        año_desde: values[2]?.trim(),
-        id_marca: parseInt(values[4]?.trim()),
-        id_gama: parseInt(values[5]?.trim())
-      })
+      const [marca, gama, desde, hasta, id_marca, id_gama] = values
+      
+      if (marca && gama && desde) {
+        models.push({
+          marca: marca.replace('﻿', ''), // Remove BOM if present
+          gama,
+          año_desde: desde,
+          id_marca: parseInt(id_marca),
+          id_gama: parseInt(id_gama)
+        })
+      }
     }
 
     console.log(`Parsed ${models.length} vehicle models`)
+
+    // Group by marca+gama to identify generations
+    const modelGroups = new Map<string, any[]>()
+    for (const model of models) {
+      const key = `${model.marca}|${model.gama}`
+      if (!modelGroups.has(key)) {
+        modelGroups.set(key, [])
+      }
+      modelGroups.get(key)!.push(model)
+    }
+
+    // Sort each group by año_desde and calculate año_hasta
+    for (const [key, group] of modelGroups) {
+      group.sort((a, b) => a.año_desde.localeCompare(b.año_desde))
+      
+      for (let i = 0; i < group.length; i++) {
+        const current = group[i]
+        const next = group[i + 1]
+        
+        if (next) {
+          // Calculate año_hasta as one month before next generation
+          const [nextYear, nextMonth] = next.año_desde.split('.').map(Number)
+          let hastaYear = nextYear
+          let hastaMonth = nextMonth - 1
+          
+          if (hastaMonth === 0) {
+            hastaMonth = 12
+            hastaYear -= 1
+          }
+          
+          current.año_hasta = `${hastaYear}.${String(hastaMonth).padStart(2, '0')}`
+        }
+        // If no next generation, año_hasta stays undefined (will be null in DB)
+      }
+    }
+
+    console.log(`Calculated año_hasta for models with multiple generations`)
 
     // Clear existing data
     const { error: deleteError } = await supabaseClient
