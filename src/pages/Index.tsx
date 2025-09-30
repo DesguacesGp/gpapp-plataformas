@@ -34,6 +34,8 @@ const Index = () => {
   const [totalProducts, setTotalProducts] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [sortField, setSortField] = useState<string>("ai_processed");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const productsPerPage = 20;
 
   // Check authentication
@@ -76,12 +78,22 @@ const Index = () => {
       const { count } = await query;
       setTotalProducts(count || 0);
 
-      // Apply pagination and ordering
+      // Apply pagination
       const from = (currentPage - 1) * productsPerPage;
       const to = from + productsPerPage - 1;
       
+      // Apply ordering based on sortField
+      if (sortField === "ai_processed") {
+        // Order by AI processed status (products with translated_title first)
+        query = query.order('translated_title', { ascending: false, nullsFirst: false })
+                     .order('created_at', { ascending: false });
+      } else {
+        // Order by the selected field
+        const ascending = sortDirection === "asc";
+        query = query.order(sortField, { ascending, nullsFirst: false });
+      }
+      
       const { data: productsData, error: productsError } = await query
-        .order('created_at', { ascending: false })
         .range(from, to);
 
       if (productsError) throw productsError;
@@ -238,7 +250,7 @@ const Index = () => {
     if (!isCheckingAuth) {
       loadProducts();
     }
-  }, [isCheckingAuth, currentPage, searchTerm, categoryFilter]);
+  }, [isCheckingAuth, currentPage, searchTerm, categoryFilter, sortField, sortDirection]);
 
   const handleSearchChange = (search: string) => {
     setSearchTerm(search);
@@ -248,6 +260,18 @@ const Index = () => {
   const handleCategoryChange = (category: string) => {
     setCategoryFilter(category);
     setCurrentPage(1); // Reset to first page on filter change
+  };
+
+  const handleSortChange = (field: string) => {
+    if (sortField === field) {
+      // Toggle direction if same field
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      // New field, default to ascending
+      setSortField(field);
+      setSortDirection("asc");
+    }
+    setCurrentPage(1); // Reset to first page on sort change
   };
 
   const totalPages = Math.ceil(totalProducts / productsPerPage);
@@ -370,6 +394,9 @@ const Index = () => {
                 totalPages={totalPages}
                 onPageChange={setCurrentPage}
                 totalProducts={totalProducts}
+                sortField={sortField}
+                sortDirection={sortDirection}
+                onSortChange={handleSortChange}
               />
             )}
           </CardContent>

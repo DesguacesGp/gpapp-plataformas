@@ -4,7 +4,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search } from "lucide-react";
+import { Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import {
   Pagination,
   PaginationContent,
@@ -39,6 +39,9 @@ interface ProductsTableProps {
   totalPages: number;
   onPageChange: (page: number) => void;
   totalProducts: number;
+  sortField: string;
+  sortDirection: "asc" | "desc";
+  onSortChange: (field: string) => void;
 }
 
 export const ProductsTable = ({ 
@@ -51,7 +54,10 @@ export const ProductsTable = ({
   currentPage,
   totalPages,
   onPageChange,
-  totalProducts
+  totalProducts,
+  sortField,
+  sortDirection,
+  onSortChange
 }: ProductsTableProps) => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [localSearch, setLocalSearch] = useState(searchTerm);
@@ -73,6 +79,29 @@ export const ProductsTable = ({
 
     return () => clearTimeout(timer);
   }, [localSearch, onSearchChange]);
+
+  const SortButton = ({ field, children }: { field: string; children: React.ReactNode }) => {
+    const isActive = sortField === field || (field === "ai_processed" && sortField === "ai_processed");
+    
+    return (
+      <Button 
+        variant="ghost" 
+        onClick={() => onSortChange(field)}
+        className="h-8 p-0 hover:bg-transparent font-semibold"
+      >
+        {children}
+        {isActive ? (
+          sortDirection === "asc" ? (
+            <ArrowUp className="ml-2 h-4 w-4" />
+          ) : (
+            <ArrowDown className="ml-2 h-4 w-4" />
+          )
+        ) : (
+          <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />
+        )}
+      </Button>
+    );
+  };
 
   const toggleSelect = (id: string) => {
     const newSelected = new Set(selectedIds);
@@ -213,15 +242,31 @@ export const ProductsTable = ({
                   onCheckedChange={toggleSelectAll}
                 />
               </TableHead>
-              <TableHead className="font-semibold">SKU</TableHead>
-              <TableHead className="font-semibold">Descripción</TableHead>
-              <TableHead className="font-semibold">Título Traducido</TableHead>
+              <TableHead>
+                <SortButton field="sku">SKU</SortButton>
+              </TableHead>
+              <TableHead>
+                <SortButton field="description">Descripción</SortButton>
+              </TableHead>
+              <TableHead>
+                <SortButton field="ai_processed">Procesado IA</SortButton>
+              </TableHead>
               <TableHead className="font-semibold">Bullet Points</TableHead>
-              <TableHead className="text-center font-semibold">Stock</TableHead>
-              <TableHead className="text-right font-semibold">Precio Base</TableHead>
-              <TableHead className="text-right font-semibold">Precio Final</TableHead>
-              <TableHead className="text-center font-semibold">Imagen</TableHead>
-              <TableHead className="font-semibold">Categoría</TableHead>
+              <TableHead className="text-center">
+                <SortButton field="stock">Stock</SortButton>
+              </TableHead>
+              <TableHead className="text-right">
+                <SortButton field="price">Precio Base</SortButton>
+              </TableHead>
+              <TableHead className="text-right">
+                <SortButton field="final_price">Precio Final</SortButton>
+              </TableHead>
+              <TableHead className="text-center">
+                <SortButton field="has_image">Imagen</SortButton>
+              </TableHead>
+              <TableHead>
+                <SortButton field="category">Categoría</SortButton>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
