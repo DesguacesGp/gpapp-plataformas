@@ -108,8 +108,13 @@ Deno.serve(async (req) => {
 Tu tarea es:
 1. Traducir la descripción del producto del portugués al español (ya tiene algunas traducciones aplicadas).
 2. Generar un título normalizado siguiendo el formato: "TIPO PIEZA + MARCA + MODELO + AÑO + CARACTERÍSTICAS"
-   - La estructura típica es: MARCA MODELO *TIPO_PIEZA CARACTERÍSTICAS
-   - Ejemplo: "FORD FOCUS *FARO DRT" -> "Faro Delantero Derecho Ford Focus"
+   - La estructura típica es: MARCA MODELO AÑO-* *TIPO_PIEZA CARACTERÍSTICAS
+   - El patrón "AÑO-*" significa "desde ese año en adelante", ejemplo: "04-*" = "desde 2004", "13-*" = "desde 2013"
+   - Si aparece "AÑO.MES-*" ejemplo "2020.03-*" = "desde marzo 2020"
+   - Ejemplos de conversión:
+     * "FORD FOCUS 04-* *FARO DRT" → "Faro Delantero Derecho Ford Focus desde 2004"
+     * "RENAULT MODUS 04-*FAROLIM LAT ESQ BRANCO" → "Piloto Lateral Izquierdo Blanco Renault Modus desde 2004"
+     * "MERCEDES E W213 2020.03-*FAROLIM TRAS ESQ" → "Piloto Trasero Izquierdo Mercedes Clase E W213 desde marzo 2020"
 3. Generar exactamente 5 bullet points en español para Amazon/eBay con buena extensión y repetición moderada de keywords.
 
 Responde SOLO con un JSON válido en este formato exacto:
