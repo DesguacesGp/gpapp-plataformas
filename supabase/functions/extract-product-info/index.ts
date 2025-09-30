@@ -22,13 +22,13 @@ Deno.serve(async (req) => {
     }
 
     // Get products that have translated_title but missing articulo, marca, or modelo
-    // Process in batches of 50 to manage memory
+    // Process in batches of 10 to avoid timeouts
     const { data: products, error: fetchError } = await supabaseClient
       .from('vauner_products')
       .select('*')
       .not('translated_title', 'is', null)
       .or('articulo.is.null,marca.is.null,modelo.is.null')
-      .limit(50)
+      .limit(10)
 
     if (fetchError) throw fetchError
 
