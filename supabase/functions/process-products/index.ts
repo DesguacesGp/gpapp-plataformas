@@ -34,7 +34,8 @@ const DICTIONARY = {
   'ASF': 'Asférico',
   'REB': 'Abatible',
   'C/CONF': 'Confort',
-  'FAROLIM': 'Piloto'
+  'FAROLIM': 'Piloto',
+  'VW': 'Volkswagen'
 }
 
 Deno.serve(async (req) => {
