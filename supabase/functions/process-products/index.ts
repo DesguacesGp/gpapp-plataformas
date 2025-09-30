@@ -35,6 +35,7 @@ const DICTIONARY = {
   'REB': 'Abatible',
   'C/CONF': 'Confort',
   'FAROLIM': 'Piloto',
+  'PUNHO': 'Maneta',
   'VW': 'Volkswagen'
 }
 
@@ -115,36 +116,42 @@ Deno.serve(async (req) => {
 
 IMPORTANTE: Las piezas son AFTERMARKET OEM EQUIVALENTE, NO son originales de fábrica. Debes ser honesto y usar términos como "Compatible OEM", "Calidad OEM", "OEM Equivalente", "Aftermarket Premium", pero NUNCA "Original" o "Original de fábrica".
 
+INFORMACIÓN CLAVE SOBRE LATERALIDAD:
+- Cuando el producto es "Derecho" = Lado COPILOTO
+- Cuando el producto es "Izquierdo" = Lado CONDUCTOR
+- Esta información es CRÍTICA y debe aparecer tanto en el título como en los bullet points para ayudar al cliente a elegir la pieza correcta
+
 Tu tarea es:
 1. Traducir la descripción del producto del portugués al español (ya tiene algunas traducciones aplicadas).
 
 2. Generar un título SEO LARGO Y DESCRIPTIVO (MÍNIMO 150 caracteres, óptimo 180-200 caracteres) siguiendo estas reglas:
-   - Estructura: TIPO_PIEZA + Posición + MARCA + MODELO + Años_Compatibilidad + Características_Técnicas + Compatible_OEM
+   - Estructura: TIPO_PIEZA + Posición_CON_LADO + MARCA + MODELO + Años_Compatibilidad + Características_Técnicas + Compatible_OEM
    - El patrón "AÑO-*" significa "desde ese año en adelante"
-   - DEBE incluir: tipo de pieza, posición (derecho/izquierdo/delantero/trasero), marca, modelo, años de compatibilidad
+   - DEBE incluir: tipo de pieza, posición clara (ej: "Derecho Lado Copiloto" o "Izquierdo Lado Conductor"), marca, modelo, años
    - AÑADIR keywords relevantes: "Compatible OEM", "Calidad OEM", "Alta Calidad", "Nuevo", "Aftermarket Premium", "Recambio", etc.
    - Repetir marca y modelo si es necesario para llegar a 150+ caracteres
    - Incluir características técnicas específicas (eléctrico, térmico, con sensor, etc.)
    
    Ejemplos de títulos OPTIMIZADOS:
-   * "Faro Delantero Derecho para Ford Focus desde 2004 - Recambio de Alta Calidad Compatible OEM - Faro Eléctrico Nuevo Aftermarket Premium Ford Focus 04 en Adelante"
-   * "Piloto Lateral Izquierdo Blanco Renault Modus desde 2004 - Luz Lateral Izquierda Compatible OEM Renault Modus 2004+ Alta Calidad Nuevo Recambio Calidad OEM"
-   * "Piloto Trasero Izquierdo Mercedes Clase E W213 desde Marzo 2020 - Luz Trasera Izquierda Aftermarket Mercedes Benz E W213 2020+ Recambio Nuevo Compatible OEM Alta Calidad"
+   * "Faro Delantero Derecho Lado Copiloto Ford Focus desde 2004 - Recambio Alta Calidad Compatible OEM - Faro Eléctrico Nuevo Aftermarket Premium Ford Focus 04+"
+   * "Piloto Lateral Izquierdo Lado Conductor Blanco Renault Modus desde 2004 - Luz Lateral Compatible OEM Renault Modus 2004+ Alta Calidad Nuevo Recambio"
+   * "Maneta Exterior Derecha Lado Copiloto Mercedes Clase E W213 desde 2020 - Maneta Puerta Aftermarket Mercedes Benz E W213 2020+ Compatible OEM Nueva"
 
 3. Generar exactamente 5 bullet points optimizados para Amazon/eBay:
    - Cada bullet debe tener entre 150-200 caracteres
    - Primera letra en mayúscula, sin punto final
    - Incluir keywords naturalmente repetidas
+   - SIEMPRE mencionar el lado cuando aplique: "Derecho (Lado Copiloto)" o "Izquierdo (Lado Conductor)"
    - Destacar compatibilidad OEM, calidad equivalente, características técnicas, facilidad de instalación
    - Usar emojis sutiles si es apropiado (✓, ⭐, 🚗)
    - SER HONESTO: mencionar que es aftermarket/compatible OEM, no original
    
    Ejemplo de bullet points:
-   * "✓ Compatible con Ford Focus desde 2004 en adelante - Recambio aftermarket de alta calidad OEM equivalente que garantiza un ajuste perfecto y funcionamiento óptimo como el original"
-   * "⭐ Faro delantero derecho nuevo con tecnología eléctrica avanzada - Iluminación potente y duradera para máxima seguridad y visibilidad en carretera bajo cualquier condición"
-   * "🚗 Instalación fácil y rápida sin modificaciones - Compatible con sistema eléctrico del vehículo, plug and play directo, no requiere herramientas especiales para montaje"
-   * "✓ Fabricado con materiales de alta resistencia UV y golpes - Óptica de policarbonato resistente y carcasa duradera que soporta condiciones climáticas extremas sin deterioro"
-   * "⭐ Calidad OEM equivalente testada - Cumple con normativas europeas de homologación, aftermarket premium testado para asegurar durabilidad y rendimiento superior durante años"
+   * "✓ Compatible Ford Focus desde 2004+ - Pieza DERECHA para lado COPILOTO - Recambio aftermarket calidad OEM equivalente que garantiza ajuste perfecto y funcionamiento óptimo"
+   * "⭐ Faro delantero derecho lado copiloto con tecnología eléctrica avanzada - Iluminación potente y duradera para máxima seguridad y visibilidad en carretera"
+   * "🚗 Instalación fácil y rápida sin modificaciones - Compatible con sistema eléctrico del vehículo, plug and play directo, no requiere herramientas especiales"
+   * "✓ Fabricado con materiales de alta resistencia UV y golpes - Óptica de policarbonato resistente y carcasa duradera que soporta condiciones climáticas extremas"
+   * "⭐ Calidad OEM equivalente testada - Cumple normativas europeas homologación, aftermarket premium testado para asegurar durabilidad y rendimiento superior"
 
 Responde SOLO con un JSON válido en este formato exacto:
 {
