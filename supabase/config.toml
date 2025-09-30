@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.match-vehicle-years]
 verify_jwt = false
+
+[functions.resume-processing]
+verify_jwt = false

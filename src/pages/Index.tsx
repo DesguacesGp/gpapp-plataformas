@@ -215,19 +215,19 @@ const Index = () => {
     }
   };
 
-  // Función que procesa con IA usando el sistema de colas
+  // Función que procesa con IA usando el sistema de colas (batch size reducido a 10)
   const processEverythingWithAI = async () => {
     setIsProcessingAll(true);
     
     try {
-      toast.info('🤖 Iniciando procesamiento continuo con IA...');
+      toast.info('🤖 Iniciando procesamiento continuo con IA (batches de 10 productos)...');
       
-      // Paso 1: Crear registro en processing_queue para títulos y bullets
+      // Crear registro en processing_queue
       const { data: queueData, error: queueError } = await supabase
         .from('processing_queue')
         .insert({
           status: 'pending',
-          batch_size: 50,
+          batch_size: 10,
           total_count: 0,
           processed_count: 0
         })
@@ -236,7 +236,7 @@ const Index = () => {
 
       if (queueError) throw queueError;
 
-      // Paso 2: Llamar a process-products una sola vez con el queueId
+      // Llamar a process-products una sola vez con el queueId
       const { error: processError } = await supabase.functions.invoke('process-products', {
         body: { queueId: queueData.id }
       });
@@ -245,11 +245,36 @@ const Index = () => {
 
       toast.success('✅ Procesamiento iniciado. El sistema continuará automáticamente en segundo plano.');
       
-      // Recargar productos después de un breve delay
       setTimeout(() => loadProducts(), 2000);
     } catch (error: any) {
       console.error('Error starting AI process:', error);
       toast.error('Error al iniciar el proceso: ' + error.message);
+    } finally {
+      setIsProcessingAll(false);
+    }
+  };
+
+  // Función para reanudar procesamiento interrumpido
+  const resumeProcessing = async () => {
+    setIsProcessingAll(true);
+    
+    try {
+      toast.info('🔄 Reanudando procesamiento...');
+      
+      const { data, error } = await supabase.functions.invoke('resume-processing');
+
+      if (error) throw error;
+
+      if (data.remaining === 0) {
+        toast.success('✅ No hay productos pendientes de procesar');
+      } else {
+        toast.success(`✅ Procesamiento reanudado. ${data.remaining} productos pendientes.`);
+      }
+      
+      setTimeout(() => loadProducts(), 2000);
+    } catch (error: any) {
+      console.error('Error resuming processing:', error);
+      toast.error('Error al reanudar: ' + error.message);
     } finally {
       setIsProcessingAll(false);
     }
@@ -515,6 +540,15 @@ const Index = () => {
                 >
                   <Sparkles className={`mr-2 h-5 w-5 ${isProcessingAll ? 'animate-pulse' : ''}`} />
                   {isProcessingAll ? 'Procesando con IA...' : 'Procesar con IA'}
+                </Button>
+                <Button
+                  onClick={resumeProcessing}
+                  variant="outline"
+                  disabled={isProcessingAll || isSyncing}
+                  size="lg"
+                >
+                  <RefreshCw className="mr-2 h-5 w-5" />
+                  Reanudar Proceso
                 </Button>
                 <Button
                   onClick={exportSelected}
