@@ -73,7 +73,9 @@ Deno.serve(async (req) => {
         // Apply dictionary replacements
         let translatedDesc = product.description
         for (const [key, value] of Object.entries(DICTIONARY)) {
-          const regex = new RegExp(`\\b${key}\\b`, 'gi')
+          // Escape special regex characters in the key
+          const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+          const regex = new RegExp(`\\b${escapedKey}\\b`, 'gi')
           translatedDesc = translatedDesc.replace(regex, value)
         }
 
