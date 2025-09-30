@@ -36,7 +36,9 @@ const DICTIONARY = {
   'C/CONF': 'Confort',
   'FAROLIM': 'Piloto',
   'PUNHO': 'Maneta',
-  'VW': 'Volkswagen'
+  'VW': 'Volkswagen',
+  'C/C': 'Manual',
+  'P/P': 'Para pintar'
 }
 
 Deno.serve(async (req) => {
