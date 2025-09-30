@@ -162,7 +162,7 @@ Deno.serve(async (req) => {
       .from('processing_queue')
       .insert({
         status: 'pending',
-        batch_size: 20,
+        batch_size: 50,
         total_count: remainingCount
       })
       .select()
