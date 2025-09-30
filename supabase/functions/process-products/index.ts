@@ -67,11 +67,11 @@ Deno.serve(async (req) => {
         .eq('id', queueId)
     }
 
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')
-    if (!OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY not configured')
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')
+    if (!LOVABLE_API_KEY) {
+      throw new Error('LOVABLE_API_KEY not configured')
     }
-    console.log('OpenAI API Key configured:', OPENAI_API_KEY ? 'Yes (length: ' + OPENAI_API_KEY.length + ')' : 'No')
+    console.log('Lovable AI API Key configured:', LOVABLE_API_KEY ? 'Yes (length: ' + LOVABLE_API_KEY.length + ')' : 'No')
 
     // Get products to process
     const { data: products, error: fetchError } = await supabaseClient
@@ -115,15 +115,15 @@ Deno.serve(async (req) => {
         const maxRetries = 3
         
         while (retries <= maxRetries) {
-          // Call OpenAI GPT-5 Mini to process the product
-          aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          // Call Lovable AI Gateway with Gemini model to process the product
+          aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${OPENAI_API_KEY}`,
+              'Authorization': `Bearer ${LOVABLE_API_KEY}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              model: 'gpt-4o',
+              model: 'google/gemini-2.5-flash',
               messages: [
               {
                 role: 'system',
