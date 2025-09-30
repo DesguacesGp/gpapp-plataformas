@@ -177,7 +177,7 @@ Stock: ${product.stock}`
               processedCount.failed++
               break
             }
-            const waitTime = Math.pow(2, retries) * 2000 // 4s, 8s, 16s
+            const waitTime = Math.pow(2, retries) * 5000 // 10s, 20s, 40s
             console.log(`Rate limited for ${product.sku}, waiting ${waitTime}ms before retry ${retries}/${maxRetries}`)
             await new Promise(resolve => setTimeout(resolve, waitTime))
             continue
@@ -232,8 +232,8 @@ Stock: ${product.stock}`
           processedCount.success++
         }
 
-        // Add delay to respect rate limits (2000ms between requests)
-        await new Promise(resolve => setTimeout(resolve, 2000))
+        // Add delay to respect rate limits (5000ms between requests)
+        await new Promise(resolve => setTimeout(resolve, 5000))
 
       } catch (error) {
         console.error(`Error processing product ${product.sku}:`, error)

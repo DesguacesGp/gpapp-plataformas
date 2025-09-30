@@ -260,8 +260,8 @@ Deno.serve(async (req) => {
         console.log(`Found ${unprocessedCount || 0} total unprocessed products`)
         
         if (unprocessedCount && unprocessedCount > 0) {
-          // Process in batches of 50 to avoid overwhelming the system
-          const batchSize = 50
+          // Process in batches of 25 to avoid overwhelming the system (reduced from 50)
+          const batchSize = 25
           let processed = 0
           
           // Start processing loop (will continue until all products are processed)
@@ -298,8 +298,8 @@ Deno.serve(async (req) => {
               console.error('Error processing batch:', err)
             })
             
-            // Small delay between batches to avoid rate limits
-            await new Promise(resolve => setTimeout(resolve, 2000))
+            // Longer delay between batches to avoid rate limits (10 seconds)
+            await new Promise(resolve => setTimeout(resolve, 10000))
             
             // Continue processing next batch
             await processNextBatch()
