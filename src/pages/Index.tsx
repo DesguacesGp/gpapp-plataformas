@@ -2,18 +2,10 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { RefreshCw, Settings, Download, LogOut, Sparkles, DollarSign, RotateCcw } from "lucide-react";
+import { RefreshCw, Settings, Download, LogOut, Sparkles, DollarSign } from "lucide-react";
 import { ProductsTable } from "@/components/ProductsTable";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
 
 interface Product {
   id: string;
@@ -41,10 +33,6 @@ const Index = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isProcessingAll, setIsProcessingAll] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const [isReprocessDialogOpen, setIsReprocessDialogOpen] = useState(false);
-  const [selectedReprocessCategory, setSelectedReprocessCategory] = useState<string>("");
-  const [isReprocessing, setIsReprocessing] = useState(false);
-  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
   
   // Pagination and filters
   const [currentPage, setCurrentPage] = useState(1);
@@ -75,22 +63,6 @@ const Index = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  // Load available categories
-  useEffect(() => {
-    const loadCategories = async () => {
-      const { data, error } = await supabase
-        .from('category_config')
-        .select('category_name')
-        .eq('enabled', true)
-        .order('category_name', { ascending: true });
-
-      if (!error && data) {
-        setAvailableCategories(data.map(cat => cat.category_name));
-      }
-    };
-
-    loadCategories();
-  }, []);
 
   // Subscribe to realtime updates for AI processing
   useEffect(() => {
@@ -243,54 +215,43 @@ const Index = () => {
     }
   };
 
-  // Función unificada que procesa con IA (sin sincronización)
+  // Función que procesa con IA usando el sistema de colas
   const processEverythingWithAI = async () => {
     setIsProcessingAll(true);
     
     try {
-      // Paso 1: Procesar títulos y bullet points con IA (loop automático)
-      toast.info('🤖 Paso 1/2: Generando títulos y bullets con IA...');
-      await processAILoop();
+      toast.info('🤖 Iniciando procesamiento continuo con IA...');
       
-      // Paso 2: Extraer información de productos (articulo, marca, modelo, año_desde)
-      toast.info('📊 Paso 2/2: Extrayendo información de productos...');
-      await extractInfoLoop();
+      // Paso 1: Crear registro en processing_queue para títulos y bullets
+      const { data: queueData, error: queueError } = await supabase
+        .from('processing_queue')
+        .insert({
+          status: 'pending',
+          batch_size: 50,
+          total_count: 0,
+          processed_count: 0
+        })
+        .select()
+        .single();
 
-      toast.success('🎉 ¡Proceso completo! Todos los productos han sido procesados con IA');
-      loadProducts();
+      if (queueError) throw queueError;
+
+      // Paso 2: Llamar a process-products una sola vez con el queueId
+      const { error: processError } = await supabase.functions.invoke('process-products', {
+        body: { queueId: queueData.id }
+      });
+
+      if (processError) throw processError;
+
+      toast.success('✅ Procesamiento iniciado. El sistema continuará automáticamente en segundo plano.');
+      
+      // Recargar productos después de un breve delay
+      setTimeout(() => loadProducts(), 2000);
     } catch (error: any) {
-      console.error('Error in full AI process:', error);
-      toast.error('Error en el proceso: ' + error.message);
+      console.error('Error starting AI process:', error);
+      toast.error('Error al iniciar el proceso: ' + error.message);
     } finally {
       setIsProcessingAll(false);
-    }
-  };
-
-  // Loop para procesamiento de IA (títulos y bullets)
-  const processAILoop = async (): Promise<void> => {
-    const { data, error } = await supabase.functions.invoke('vauner-sync', {
-      body: { action: 'resume_processing' }
-    });
-
-    if (error) throw error;
-
-    // Si hay más productos por procesar, continuar
-    if (data.unprocessed && data.unprocessed > 0) {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      return processAILoop();
-    }
-  };
-
-  // Loop para extracción de información
-  const extractInfoLoop = async (): Promise<void> => {
-    const { data, error } = await supabase.functions.invoke('extract-product-info');
-    
-    if (error) throw error;
-
-    // Si hay más productos por procesar, continuar
-    if (data.hasMore) {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      return extractInfoLoop();
     }
   };
 
@@ -328,80 +289,6 @@ const Index = () => {
     toast.success(`${selectedIds.length} productos exportados`);
   };
 
-  const reprocessCategory = async () => {
-    if (!selectedReprocessCategory) {
-      toast.warning('Selecciona una categoría');
-      return;
-    }
-
-    setIsReprocessing(true);
-    setIsReprocessDialogOpen(false);
-
-    try {
-      // Get total count of products in the category
-      const { count: totalCount } = await supabase
-        .from('vauner_products')
-        .select('id', { count: 'exact', head: true })
-        .eq('category', selectedReprocessCategory);
-
-      if (!totalCount || totalCount === 0) {
-        toast.warning(`No hay productos en la categoría "${selectedReprocessCategory}"`);
-        setIsReprocessing(false);
-        return;
-      }
-
-      toast.info(`🔄 Iniciando reprocesamiento de ${totalCount} productos de "${selectedReprocessCategory}" en lotes...`);
-
-      const batchSize = 20; // Process 20 products at a time
-      let processedTotal = 0;
-      let failedTotal = 0;
-
-      // Process in batches
-      for (let offset = 0; offset < totalCount; offset += batchSize) {
-        // Get batch of product IDs
-        const { data: batchProducts, error: fetchError } = await supabase
-          .from('vauner_products')
-          .select('id')
-          .eq('category', selectedReprocessCategory)
-          .range(offset, offset + batchSize - 1);
-
-        if (fetchError) throw fetchError;
-
-        if (!batchProducts || batchProducts.length === 0) continue;
-
-        const productIds = batchProducts.map(p => p.id);
-
-        toast.info(`📦 Procesando lote ${Math.floor(offset / batchSize) + 1} de ${Math.ceil(totalCount / batchSize)} (${processedTotal}/${totalCount} completados)...`);
-
-        // Call the process-products edge function
-        const { data, error } = await supabase.functions.invoke('process-products', {
-          body: { productIds }
-        });
-
-        if (error) {
-          console.error(`Error processing batch at offset ${offset}:`, error);
-          failedTotal += productIds.length;
-          // Continue with next batch even if this one fails
-          continue;
-        }
-
-        processedTotal += data.processed || 0;
-        failedTotal += data.failed || 0;
-
-        // Short delay between batches to avoid rate limits
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-
-      toast.success(`✅ Reprocesamiento completado: ${processedTotal} exitosos, ${failedTotal} fallidos de ${totalCount} totales`);
-      loadProducts();
-    } catch (error: any) {
-      console.error('Error reprocessing category:', error);
-      toast.error('Error al reprocesar: ' + error.message);
-    } finally {
-      setIsReprocessing(false);
-      setSelectedReprocessCategory("");
-    }
-  };
 
   const exportAmazonFlatFile = () => {
     if (selectedIds.length === 0) {
@@ -623,20 +510,11 @@ const Index = () => {
                 <Button
                   onClick={processEverythingWithAI}
                   variant="default"
-                  disabled={isProcessingAll || isSyncing || isReprocessing}
+                  disabled={isProcessingAll || isSyncing}
                   size="lg"
                 >
                   <Sparkles className={`mr-2 h-5 w-5 ${isProcessingAll ? 'animate-pulse' : ''}`} />
                   {isProcessingAll ? 'Procesando con IA...' : 'Procesar con IA'}
-                </Button>
-                <Button
-                  onClick={() => setIsReprocessDialogOpen(true)}
-                  variant="secondary"
-                  disabled={isProcessingAll || isSyncing || isReprocessing}
-                  size="lg"
-                >
-                  <RotateCcw className={`mr-2 h-5 w-5 ${isReprocessing ? 'animate-spin' : ''}`} />
-                  {isReprocessing ? 'Reprocesando...' : 'Reprocesar Categoría'}
                 </Button>
                 <Button
                   onClick={exportSelected}
@@ -682,55 +560,6 @@ const Index = () => {
         </Card>
       </div>
 
-      {/* Dialog para reprocesar categoría */}
-      <Dialog open={isReprocessDialogOpen} onOpenChange={setIsReprocessDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Reprocesar Categoría Completa</DialogTitle>
-            <DialogDescription>
-              Selecciona una categoría para reprocesar todos sus productos con las últimas traducciones y configuraciones de IA.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="py-4">
-            <label htmlFor="category-select" className="block text-sm font-medium mb-2">
-              Categoría
-            </label>
-            <select
-              id="category-select"
-              value={selectedReprocessCategory}
-              onChange={(e) => setSelectedReprocessCategory(e.target.value)}
-              className="w-full px-3 py-2 border rounded-md bg-background text-foreground"
-            >
-              <option value="">Selecciona una categoría</option>
-              {availableCategories.map((category) => (
-                <option key={category} value={category}>
-                  {category}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsReprocessDialogOpen(false);
-                setSelectedReprocessCategory("");
-              }}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={reprocessCategory}
-              disabled={!selectedReprocessCategory}
-            >
-              <RotateCcw className="mr-2 h-4 w-4" />
-              Reprocesar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
