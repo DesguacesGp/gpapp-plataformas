@@ -507,6 +507,9 @@ const Index = () => {
           <div className="flex items-center justify-between mb-2">
             <h1 className="text-4xl font-bold tracking-tight">Panel Vauner</h1>
             <div className="flex gap-2">
+              <Button variant="outline" onClick={() => navigate("/compatibilities")}>
+                Compatibilidades
+              </Button>
               <Button variant="outline" size="icon" onClick={() => navigate("/pricing")}>
                 <DollarSign className="h-4 w-4" />
               </Button>

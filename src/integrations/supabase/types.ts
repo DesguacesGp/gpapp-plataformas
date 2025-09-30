@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      brand_equivalences: {
+        Row: {
+          confidence_level: string
+          created_at: string
+          created_by: string
+          id: string
+          is_active: boolean
+          notes: string | null
+          reference_brand: string
+          updated_at: string
+          vauner_brand: string
+        }
+        Insert: {
+          confidence_level: string
+          created_at?: string
+          created_by: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          reference_brand: string
+          updated_at?: string
+          vauner_brand: string
+        }
+        Update: {
+          confidence_level?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          reference_brand?: string
+          updated_at?: string
+          vauner_brand?: string
+        }
+        Relationships: []
+      }
       category_config: {
         Row: {
           category_code: string
@@ -38,6 +74,48 @@ export type Database = {
           enabled?: boolean
           id?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      model_equivalences: {
+        Row: {
+          confidence_level: string
+          created_at: string
+          created_by: string
+          id: string
+          is_active: boolean
+          notes: string | null
+          reference_brand: string
+          reference_model: string
+          updated_at: string
+          vauner_brand: string
+          vauner_model: string
+        }
+        Insert: {
+          confidence_level: string
+          created_at?: string
+          created_by: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          reference_brand: string
+          reference_model: string
+          updated_at?: string
+          vauner_brand: string
+          vauner_model: string
+        }
+        Update: {
+          confidence_level?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          reference_brand?: string
+          reference_model?: string
+          updated_at?: string
+          vauner_brand?: string
+          vauner_model?: string
         }
         Relationships: []
       }
