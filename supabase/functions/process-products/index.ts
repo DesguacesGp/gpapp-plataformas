@@ -153,10 +153,18 @@ Tu tarea es:
    * "✓ Fabricado con materiales de alta resistencia UV y golpes - Óptica de policarbonato resistente y carcasa duradera que soporta condiciones climáticas extremas"
    * "⭐ Calidad OEM equivalente testada - Cumple normativas europeas homologación, aftermarket premium testado para asegurar durabilidad y rendimiento superior"
 
+4. EXTRAER información estructurada del producto:
+   - articulo: El TIPO DE PIEZA (ej: "Faro", "Piloto", "Retrovisor", "Elevalunas", "Parachoques", "Cerradura", etc.)
+   - marca: La MARCA del vehículo (ej: "Ford", "Volkswagen", "Seat", "Renault", "Fiat", "Citroen", "Nissan", etc.)
+   - modelo: El MODELO específico del vehículo (ej: "Focus", "Golf", "Leon", "Modus", "Ducato", "Micra", etc.)
+
 Responde SOLO con un JSON válido en este formato exacto:
 {
   "translated_title": "título SEO largo y descriptivo (150-200 caracteres)",
-  "bullet_points": ["bullet 1 (150-200 chars)", "bullet 2", "bullet 3", "bullet 4", "bullet 5"]
+  "bullet_points": ["bullet 1 (150-200 chars)", "bullet 2", "bullet 3", "bullet 4", "bullet 5"],
+  "articulo": "tipo de pieza",
+  "marca": "marca del vehículo",
+  "modelo": "modelo del vehículo"
 }
 
 NO agregues texto adicional, SOLO el JSON.`
@@ -227,7 +235,10 @@ Stock: ${product.stock}`
           .from('vauner_products')
           .update({
             translated_title: processedData.translated_title,
-            bullet_points: processedData.bullet_points
+            bullet_points: processedData.bullet_points,
+            articulo: processedData.articulo || null,
+            marca: processedData.marca || null,
+            modelo: processedData.modelo || null
           })
           .eq('id', product.id)
 

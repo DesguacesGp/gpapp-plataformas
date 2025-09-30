@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { RefreshCw, Settings, Download, LogOut, Sparkles, DollarSign } from "lucide-react";
+import { RefreshCw, Settings, Download, LogOut, Sparkles, DollarSign, Database } from "lucide-react";
 import { ProductsTable } from "@/components/ProductsTable";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -31,6 +31,7 @@ const Index = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isResuming, setIsResuming] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   
   // Pagination and filters
@@ -242,6 +243,23 @@ const Index = () => {
       toast.error('Error al reanudar procesamiento: ' + error.message);
     } finally {
       setIsResuming(false);
+    }
+  };
+
+  const extractProductInfo = async () => {
+    setIsExtracting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('extract-product-info');
+      
+      if (error) throw error;
+      
+      toast.success(data.message || 'Información extraída correctamente');
+      setTimeout(() => loadProducts(), 2000);
+    } catch (error: any) {
+      console.error('Error extracting product info:', error);
+      toast.error('Error al extraer información: ' + error.message);
+    } finally {
+      setIsExtracting(false);
     }
   };
 
@@ -492,6 +510,14 @@ const Index = () => {
                 >
                   <Sparkles className={`mr-2 h-4 w-4 ${isResuming ? 'animate-pulse' : ''}`} />
                   {isResuming ? 'Reanudando...' : 'Reanudar IA'}
+                </Button>
+                <Button
+                  onClick={extractProductInfo}
+                  variant="secondary"
+                  disabled={isExtracting}
+                >
+                  <Database className={`mr-2 h-4 w-4 ${isExtracting ? 'animate-pulse' : ''}`} />
+                  {isExtracting ? 'Extrayendo...' : 'Extraer Info'}
                 </Button>
                 <Button
                   onClick={processProducts}
