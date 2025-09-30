@@ -75,13 +75,19 @@ Tu tarea es extraer la siguiente información de productos de automoción:
    - Solo el nombre del modelo
    - Sin años ni generaciones
 
+4. año_desde: El año de inicio extraído de la descripción (formato: YYYY)
+   - Busca patrones como "97-*", "2010-*", "05-", etc. en la descripción
+   - Convierte años de 2 dígitos a 4 dígitos (97 → 1997, 05 → 2005)
+   - Si es menor a 80, asume 2000s (05 → 2005), si es 80 o mayor asume 1900s (97 → 1997)
+
 Si no puedes determinar algún campo con seguridad, devuelve null para ese campo.
 
 Responde SOLO con un JSON válido en este formato exacto:
 {
   "articulo": "tipo de pieza o null",
   "marca": "marca del vehículo o null",
-  "modelo": "modelo del vehículo o null"
+  "modelo": "modelo del vehículo o null",
+  "año_desde": "YYYY o null"
 }
 
 NO agregues texto adicional, SOLO el JSON.`
@@ -92,6 +98,7 @@ NO agregues texto adicional, SOLO el JSON.`
 
 Título: ${product.translated_title || ''}
 Descripción: ${product.description || ''}
+SKU: ${product.sku || ''}
 Categoría: ${product.category || ''}`
                 }
               ],
@@ -151,6 +158,7 @@ Categoría: ${product.category || ''}`
         if (extractedData.articulo && !product.articulo) updateData.articulo = extractedData.articulo
         if (extractedData.marca && !product.marca) updateData.marca = extractedData.marca
         if (extractedData.modelo && !product.modelo) updateData.modelo = extractedData.modelo
+        if (extractedData.año_desde && !product.año_desde) updateData.año_desde = extractedData.año_desde
 
         if (Object.keys(updateData).length > 0) {
           const { error: updateError } = await supabaseClient

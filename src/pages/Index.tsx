@@ -34,8 +34,6 @@ const Index = () => {
   const [isResuming, setIsResuming] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const [isImporting, setIsImporting] = useState(false);
-  const [isMatching, setIsMatching] = useState(false);
   
   // Pagination and filters
   const [currentPage, setCurrentPage] = useState(1);
@@ -269,69 +267,7 @@ const Index = () => {
     }
   };
 
-  const importVehicleModels = async () => {
-    setIsImporting(true);
-    try {
-      // Read CSV file from user upload
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = '.csv';
-      
-      input.onchange = async (e) => {
-        const file = (e.target as HTMLInputElement).files?.[0];
-        if (!file) {
-          setIsImporting(false);
-          return;
-        }
-        
-        const reader = new FileReader();
-        reader.onload = async (event) => {
-          const csvData = event.target?.result as string;
-          
-          const { data, error } = await supabase.functions.invoke('import-vehicle-models', {
-            body: { csvData }
-          });
-          
-          if (error) throw error;
-          
-          toast.success(data.message || 'Modelos de vehículos importados correctamente');
-          setIsImporting(false);
-        };
-        
-        reader.onerror = () => {
-          toast.error('Error al leer el archivo CSV');
-          setIsImporting(false);
-        };
-        
-        reader.readAsText(file);
-      };
-      
-      input.click();
-    } catch (error: any) {
-      console.error('Error importing vehicle models:', error);
-      toast.error(error.message || 'Error al importar modelos de vehículos');
-      setIsImporting(false);
-    }
-  };
 
-  const matchVehicleYears = async () => {
-    setIsMatching(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('match-vehicle-years', {
-        body: { productIds: selectedIds.length > 0 ? selectedIds : null }
-      });
-      
-      if (error) throw error;
-      
-      toast.success(data.message || 'Años de compatibilidad actualizados');
-      loadProducts();
-    } catch (error: any) {
-      console.error('Error matching years:', error);
-      toast.error(error.message || 'Error al emparejar años de vehículos');
-    } finally {
-      setIsMatching(false);
-    }
-  };
 
   const exportSelected = () => {
     if (selectedIds.length === 0) {
@@ -592,22 +528,6 @@ const Index = () => {
                 >
                   <Database className={`mr-2 h-4 w-4 ${isExtracting ? 'animate-pulse' : ''}`} />
                   {isExtracting ? 'Extrayendo...' : 'Extraer Info (Manual)'}
-                </Button>
-                <Button
-                  onClick={importVehicleModels}
-                  variant="outline"
-                  disabled={isImporting}
-                >
-                  <Download className={`mr-2 h-4 w-4 ${isImporting ? 'animate-pulse' : ''}`} />
-                  {isImporting ? 'Importando...' : 'Importar Modelos CSV'}
-                </Button>
-                <Button
-                  onClick={matchVehicleYears}
-                  variant="outline"
-                  disabled={isMatching}
-                >
-                  <RefreshCw className={`mr-2 h-4 w-4 ${isMatching ? 'animate-pulse' : ''}`} />
-                  {isMatching ? 'Emparejando...' : 'Actualizar Años'}
                 </Button>
                 <Button
                   onClick={exportSelected}
