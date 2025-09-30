@@ -149,6 +149,48 @@ export type Database = {
         }
         Relationships: []
       }
+      processing_queue: {
+        Row: {
+          batch_size: number
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          last_product_id: string | null
+          processed_count: number
+          started_at: string | null
+          status: string
+          total_count: number
+          updated_at: string
+        }
+        Insert: {
+          batch_size?: number
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          last_product_id?: string | null
+          processed_count?: number
+          started_at?: string | null
+          status?: string
+          total_count?: number
+          updated_at?: string
+        }
+        Update: {
+          batch_size?: number
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          last_product_id?: string | null
+          processed_count?: number
+          started_at?: string | null
+          status?: string
+          total_count?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       vauner_config: {
         Row: {
           config_key: string

@@ -53,8 +53,19 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { productIds } = await req.json()
-    console.log(`Processing ${productIds.length} products`)
+    const { productIds, queueId } = await req.json()
+    console.log(`Processing batch - ProductIds: ${productIds?.length}, QueueId: ${queueId}`)
+    
+    // If queueId provided, update queue status to processing
+    if (queueId) {
+      await supabaseClient
+        .from('processing_queue')
+        .update({ 
+          status: 'processing',
+          started_at: new Date().toISOString()
+        })
+        .eq('id', queueId)
+    }
 
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')
     if (!OPENAI_API_KEY) {
@@ -300,7 +311,7 @@ Stock: ${product.stock}`
       }
     }
 
-    // Check if there are more products to process
+    // Update queue status and check if there are more products to process
     const { count: remainingCount } = await supabaseClient
       .from('vauner_products')
       .select('*', { count: 'exact', head: true })
@@ -308,9 +319,21 @@ Stock: ${product.stock}`
     
     console.log(`Batch complete. Processed: ${processedCount.success}, Failed: ${processedCount.failed}, Remaining: ${remainingCount || 0}`)
     
-    // If there are more products, trigger another batch automatically
+    // Update current queue entry
+    if (queueId) {
+      await supabaseClient
+        .from('processing_queue')
+        .update({ 
+          status: remainingCount && remainingCount > 0 ? 'completed' : 'completed',
+          processed_count: processedCount.success,
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', queueId)
+    }
+    
+    // If there are more products, create a new queue entry and trigger immediately
     if (remainingCount && remainingCount > 0) {
-      console.log('More products remaining, triggering next batch in 5 seconds...')
+      console.log('More products remaining, creating new queue entry and triggering next batch...')
       
       // Get next batch of product IDs
       const { data: nextBatch } = await supabaseClient
@@ -322,27 +345,68 @@ Stock: ${product.stock}`
       if (nextBatch && nextBatch.length > 0) {
         const nextProductIds = nextBatch.map(p => p.id)
         
-        // Trigger next batch in background after delay
-        setTimeout(() => {
-          fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/process-products`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ productIds: nextProductIds })
+        // Create new queue entry
+        const { data: newQueue } = await supabaseClient
+          .from('processing_queue')
+          .insert({
+            status: 'pending',
+            batch_size: nextProductIds.length,
+            total_count: remainingCount
           })
-            .then(response => {
-              if (response.ok) {
-                console.log('Next batch triggered successfully')
-              } else {
-                console.error('Failed to trigger next batch:', response.status)
+          .select()
+          .single()
+        
+        // Trigger next batch immediately in background
+        const triggerNextBatch = async () => {
+          try {
+            console.log('Triggering next batch with queue ID:', newQueue?.id)
+            const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/process-products`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ 
+                productIds: nextProductIds,
+                queueId: newQueue?.id
+              })
+            })
+            
+            if (response.ok) {
+              console.log('Next batch triggered successfully')
+            } else {
+              const errorText = await response.text()
+              console.error('Failed to trigger next batch:', response.status, errorText)
+              
+              // Mark queue as error
+              if (newQueue?.id) {
+                await supabaseClient
+                  .from('processing_queue')
+                  .update({ 
+                    status: 'error',
+                    error_message: `Failed to trigger: ${response.status}`
+                  })
+                  .eq('id', newQueue.id)
               }
-            })
-            .catch(error => {
-              console.error('Error triggering next batch:', error)
-            })
-        }, 5000)
+            }
+          } catch (error) {
+            console.error('Error triggering next batch:', error)
+            
+            // Mark queue as error
+            if (newQueue?.id) {
+              await supabaseClient
+                .from('processing_queue')
+                .update({ 
+                  status: 'error',
+                  error_message: error instanceof Error ? error.message : 'Unknown error'
+                })
+                .eq('id', newQueue.id)
+            }
+          }
+        }
+        
+        // Trigger in background without awaiting
+        triggerNextBatch()
       }
     }
 

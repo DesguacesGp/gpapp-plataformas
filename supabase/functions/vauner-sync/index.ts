@@ -325,55 +325,51 @@ Deno.serve(async (req) => {
         console.log(`Found ${unprocessedCount || 0} total unprocessed products`)
         
         if (unprocessedCount && unprocessedCount > 0) {
-          // Process in batches of 25 to avoid overwhelming the system (reduced from 50)
-          const batchSize = 25
-          let processed = 0
+          console.log('Setting up automatic AI processing with queue system')
           
-          // Start processing loop (will continue until all products are processed)
-          const processNextBatch = async () => {
-            const { data: batch, error: batchError } = await supabaseClient
-              .from('vauner_products')
-              .select('id')
-              .is('translated_title', null)
-              .limit(batchSize)
+          // Get first batch
+          const { data: firstBatch } = await supabaseClient
+            .from('vauner_products')
+            .select('id')
+            .is('translated_title', null)
+            .limit(50)
+          
+          if (firstBatch && firstBatch.length > 0) {
+            const productIds = firstBatch.map(p => p.id)
             
-            if (batchError || !batch || batch.length === 0) {
-              console.log(`Processing complete. Total processed: ${processed}`)
-              return
-            }
+            // Create queue entry
+            const { data: queueEntry } = await supabaseClient
+              .from('processing_queue')
+              .insert({
+                status: 'pending',
+                batch_size: productIds.length,
+                total_count: unprocessedCount
+              })
+              .select()
+              .single()
             
-            const productIds = batch.map(p => p.id)
+            console.log('Created queue entry:', queueEntry?.id)
             
-            // Trigger processing for this batch (don't await to allow parallel processing)
-            fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/process-products`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ productIds })
-            }).then(response => {
-              if (response.ok) {
-                processed += batch.length
-                console.log(`Batch processed successfully. Total: ${processed}/${unprocessedCount}`)
-              } else {
-                console.error('Failed to process batch:', response.status)
+            // Trigger first batch - don't await, let it run in background
+            fetch(
+              `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-products`,
+              {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ 
+                  productIds,
+                  queueId: queueEntry?.id
+                })
               }
-            }).catch(err => {
-              console.error('Error processing batch:', err)
+            ).catch(error => {
+              console.error('Error triggering process-products:', error)
             })
             
-            // Longer delay between batches to avoid rate limits (10 seconds)
-            await new Promise(resolve => setTimeout(resolve, 10000))
-            
-            // Continue processing next batch
-            await processNextBatch()
+            console.log('Triggered automatic processing - will continue in background')
           }
-          
-          // Start the processing loop (don't await, let it run in background)
-          processNextBatch().catch(err => {
-            console.error('Error in processing loop:', err)
-          })
           
           return new Response(
             JSON.stringify({ 
