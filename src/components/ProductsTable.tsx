@@ -4,7 +4,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, Check, Clock } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Pagination,
@@ -276,10 +277,10 @@ export const ProductsTable = ({
               <TableHead className="w-40">
                 <SortButton field="description">Descripción</SortButton>
               </TableHead>
-              <TableHead className="w-32">
-                <SortButton field="ai_processed">Título Traducido</SortButton>
+              <TableHead className="w-20 text-center">
+                <SortButton field="ai_processed">Título</SortButton>
               </TableHead>
-              <TableHead className="font-semibold w-32">Bullets</TableHead>
+              <TableHead className="font-semibold w-20 text-center">Bullets</TableHead>
               <TableHead className="text-center">
                 <SortButton field="stock">Stock</SortButton>
               </TableHead>
@@ -336,24 +337,50 @@ export const ProductsTable = ({
                     )}
                   </TableCell>
                   <TableCell className="text-xs truncate max-w-[160px]">{product.description}</TableCell>
-                  <TableCell className="max-w-[130px]">
-                    {product.translated_title ? (
-                      <span className="text-xs truncate block">{product.translated_title}</span>
-                    ) : (
-                      <Badge variant="outline" className="text-xs">Sin procesar</Badge>
-                    )}
+                  <TableCell className="text-center">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          {product.translated_title ? (
+                            <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          ) : (
+                            <Clock className="h-5 w-5 text-muted-foreground mx-auto" />
+                          )}
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-md">
+                          <p className="text-xs">
+                            {product.translated_title || "Sin procesar"}
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </TableCell>
-                  <TableCell className="max-w-[130px]">
-                    {product.bullet_points && product.bullet_points.length > 0 ? (
-                      <div className="text-xs">
-                        <span className="truncate block">{product.bullet_points[0]}</span>
-                        {product.bullet_points.length > 1 && (
-                          <span className="text-muted-foreground text-[10px]">+{product.bullet_points.length - 1}</span>
-                        )}
-                      </div>
-                    ) : (
-                      <Badge variant="outline" className="text-xs">Sin procesar</Badge>
-                    )}
+                  <TableCell className="text-center">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          {product.bullet_points && product.bullet_points.length > 0 ? (
+                            <div className="flex items-center justify-center gap-1">
+                              <Check className="h-5 w-5 text-green-600" />
+                              <span className="text-xs font-medium">{product.bullet_points.length}</span>
+                            </div>
+                          ) : (
+                            <Clock className="h-5 w-5 text-muted-foreground mx-auto" />
+                          )}
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-md">
+                          {product.bullet_points && product.bullet_points.length > 0 ? (
+                            <ul className="text-xs space-y-1 list-disc pl-4">
+                              {product.bullet_points.map((bullet, idx) => (
+                                <li key={idx}>{bullet}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="text-xs">Sin procesar</p>
+                          )}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </TableCell>
                   <TableCell className="text-center">
                     <Badge variant={product.stock > 10 ? "default" : product.stock > 0 ? "secondary" : "destructive"}>

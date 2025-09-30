@@ -184,26 +184,17 @@ const Index = () => {
     }
   };
 
-  // Función unificada que hace todo el proceso de IA automáticamente
+  // Función unificada que procesa con IA (sin sincronización)
   const processEverythingWithAI = async () => {
     setIsProcessingAll(true);
     
     try {
-      // Paso 1: Sincronizar con Vauner
-      toast.info('🔄 Paso 1/3: Sincronizando productos desde Vauner...');
-      const { data: syncData, error: syncError } = await supabase.functions.invoke('vauner-sync', {
-        body: { action: 'fetch' }
-      });
-
-      if (syncError) throw syncError;
-      toast.success(`✅ ${syncData.stats.inserted} productos nuevos sincronizados`);
-
-      // Paso 2: Procesar títulos y bullet points con IA (loop automático)
-      toast.info('🤖 Paso 2/3: Generando títulos y bullets con IA...');
+      // Paso 1: Procesar títulos y bullet points con IA (loop automático)
+      toast.info('🤖 Paso 1/2: Generando títulos y bullets con IA...');
       await processAILoop();
       
-      // Paso 3: Extraer información de productos (loop automático)
-      toast.info('📊 Paso 3/3: Extrayendo información de productos...');
+      // Paso 2: Extraer información de productos (articulo, marca, modelo, año_desde)
+      toast.info('📊 Paso 2/2: Extrayendo información de productos...');
       await extractInfoLoop();
 
       toast.success('🎉 ¡Proceso completo! Todos los productos han sido procesados con IA');
@@ -487,13 +478,22 @@ const Index = () => {
               </div>
               <div className="flex gap-2 flex-wrap">
                 <Button
+                  onClick={syncFromVauner}
+                  variant="outline"
+                  disabled={isSyncing || isProcessingAll}
+                  size="lg"
+                >
+                  <RefreshCw className={`mr-2 h-5 w-5 ${isSyncing ? 'animate-spin' : ''}`} />
+                  {isSyncing ? 'Sincronizando...' : 'Actualizar desde Vauner'}
+                </Button>
+                <Button
                   onClick={processEverythingWithAI}
                   variant="default"
                   disabled={isProcessingAll || isSyncing}
                   size="lg"
                 >
                   <Sparkles className={`mr-2 h-5 w-5 ${isProcessingAll ? 'animate-pulse' : ''}`} />
-                  {isProcessingAll ? 'Procesando con IA...' : 'Procesar Todo con IA'}
+                  {isProcessingAll ? 'Procesando con IA...' : 'Procesar con IA'}
                 </Button>
                 <Button
                   onClick={exportSelected}
