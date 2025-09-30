@@ -1,3 +1,4 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
@@ -55,9 +56,9 @@ Deno.serve(async (req) => {
     const { productIds } = await req.json()
     console.log(`Processing ${productIds.length} products`)
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured')
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')
+    if (!OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY not configured')
     }
 
     // Get products to process
@@ -102,15 +103,15 @@ Deno.serve(async (req) => {
         const maxRetries = 3
         
         while (retries <= maxRetries) {
-          // Call AI to process the product
-          aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          // Call OpenAI GPT-5 Mini to process the product
+          aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+              'Authorization': `Bearer ${OPENAI_API_KEY}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              model: 'google/gemini-2.5-flash',
+              model: 'gpt-5-mini-2025-08-07',
               messages: [
               {
                 role: 'system',
@@ -191,8 +192,7 @@ Precio: ${product.price}€
 Stock: ${product.stock}`
               }
             ],
-            temperature: 0.7,
-            max_tokens: 1000
+            max_completion_tokens: 1000
           }),
           })
 
