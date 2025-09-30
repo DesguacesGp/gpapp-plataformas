@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Pagination,
   PaginationContent,
@@ -62,14 +63,25 @@ export const ProductsTable = ({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [localSearch, setLocalSearch] = useState(searchTerm);
 
-  // Get categories from backend (we'll use a simple approach)
+  // Get enabled categories from database
   const [categories, setCategories] = useState<string[]>([]);
 
   useEffect(() => {
-    // Extract unique categories from current products
-    const uniqueCategories = Array.from(new Set(products.map(p => p.category).filter(Boolean))) as string[];
-    setCategories(uniqueCategories);
-  }, [products]);
+    // Fetch enabled categories from category_config table
+    const loadCategories = async () => {
+      const { data, error } = await supabase
+        .from('category_config')
+        .select('category_name')
+        .eq('enabled', true)
+        .order('category_name', { ascending: true });
+
+      if (!error && data) {
+        setCategories(data.map(cat => cat.category_name));
+      }
+    };
+
+    loadCategories();
+  }, []);
 
   // Debounce search
   useEffect(() => {
