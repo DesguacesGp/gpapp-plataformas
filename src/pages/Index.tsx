@@ -168,12 +168,12 @@ const Index = () => {
     setIsSyncing(true);
     try {
       const { data, error } = await supabase.functions.invoke('vauner-sync', {
-        body: { action: 'fetch' }
+        body: { action: 'sync_products' }
       });
 
       if (error) throw error;
 
-      toast.success(`✅ Sincronización completada: ${data.stats.inserted} productos nuevos`);
+      toast.success(`✅ ${data.message || 'Sincronización completada'}`);
       
       loadProducts();
     } catch (error: any) {
