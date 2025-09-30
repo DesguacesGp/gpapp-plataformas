@@ -213,7 +213,7 @@ const Index = () => {
   };
 
 
-  const resumeProcessing = async () => {
+  const resumeProcessing = async (autoLoop: boolean = true) => {
     setIsResuming(true);
     try {
       const { data, error } = await supabase.functions.invoke('vauner-sync', {
@@ -224,45 +224,47 @@ const Index = () => {
 
       toast.success(data.message || 'Procesamiento IA reanudado');
       
-      // After processing, extract info automatically
-      if (data.processed > 0) {
-        toast.info('Extrayendo información automáticamente...');
+      // Continue processing if there are more products and autoLoop is enabled
+      if (autoLoop && data.unprocessed && data.unprocessed > 0) {
+        toast.info(`Quedan ${data.unprocessed} productos por procesar, continuando...`);
         setTimeout(() => {
-          extractProductInfo();
-        }, 3000);
+          resumeProcessing(true);
+        }, 5000);
+      } else {
+        loadProducts();
+        setIsResuming(false);
       }
-      
-      loadProducts();
     } catch (error: any) {
       console.error('Error resuming processing:', error);
       toast.error('Error al reanudar procesamiento: ' + error.message);
-    } finally {
       setIsResuming(false);
     }
   };
 
-  const extractProductInfo = async () => {
-    setIsExtracting(true);
+  const extractProductInfo = async (autoLoop: boolean = true) => {
+    if (!autoLoop) setIsExtracting(true);
+    
     try {
       const { data, error } = await supabase.functions.invoke('extract-product-info');
       
       if (error) throw error;
       
-      toast.success(data.message || 'Información extraída correctamente');
+      console.log(`Extraídos ${data.processed} productos. Quedan: ${data.remaining}`);
       
-      // If there are still products remaining, continue extracting
-      if (data.remaining && data.remaining > 0) {
-        toast.info(`Quedan ${data.remaining} productos, continuando...`);
+      // Continue extracting if there are more products and autoLoop is enabled
+      if (autoLoop && data.hasMore) {
+        // Don't show toast for every iteration, just log
         setTimeout(() => {
-          extractProductInfo();
-        }, 3000);
+          extractProductInfo(true);
+        }, 2000);
+      } else {
+        toast.success(`Extracción completada: ${data.processed} productos procesados`);
+        loadProducts();
+        setIsExtracting(false);
       }
-      
-      setTimeout(() => loadProducts(), 2000);
     } catch (error: any) {
       console.error('Error extracting product info:', error);
       toast.error('Error al extraer información: ' + error.message);
-    } finally {
       setIsExtracting(false);
     }
   };
@@ -572,20 +574,24 @@ const Index = () => {
               </div>
               <div className="flex gap-2 flex-wrap">
                 <Button
-                  onClick={resumeProcessing}
+                  onClick={() => {
+                    resumeProcessing(true);
+                    extractProductInfo(true);
+                    toast.success('🚀 Procesamiento automático iniciado en paralelo');
+                  }}
                   variant="default"
-                  disabled={isResuming || processedProducts >= totalWithImages}
+                  disabled={isResuming || isExtracting}
                 >
-                  <Sparkles className={`mr-2 h-4 w-4 ${isResuming ? 'animate-pulse' : ''}`} />
-                  {isResuming ? 'Reanudando...' : 'Reanudar IA'}
+                  <Sparkles className={`mr-2 h-4 w-4 ${(isResuming || isExtracting) ? 'animate-pulse' : ''}`} />
+                  {(isResuming || isExtracting) ? 'Procesando Todo...' : 'Procesar Todo (Automático)'}
                 </Button>
                 <Button
-                  onClick={extractProductInfo}
+                  onClick={() => extractProductInfo(false)}
                   variant="secondary"
                   disabled={isExtracting}
                 >
                   <Database className={`mr-2 h-4 w-4 ${isExtracting ? 'animate-pulse' : ''}`} />
-                  {isExtracting ? 'Extrayendo...' : 'Extraer Info'}
+                  {isExtracting ? 'Extrayendo...' : 'Extraer Info (Manual)'}
                 </Button>
                 <Button
                   onClick={importVehicleModels}

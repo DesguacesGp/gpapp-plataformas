@@ -21,13 +21,14 @@ Deno.serve(async (req) => {
       throw new Error('LOVABLE_API_KEY not configured')
     }
 
-    // Get all products that have translated_title but missing articulo, marca, or modelo
+    // Get products that have translated_title but missing articulo, marca, or modelo
+    // Process in batches of 50 to manage memory
     const { data: products, error: fetchError } = await supabaseClient
       .from('vauner_products')
       .select('*')
       .not('translated_title', 'is', null)
       .or('articulo.is.null,marca.is.null,modelo.is.null')
-      .limit(100)
+      .limit(50)
 
     if (fetchError) throw fetchError
 
@@ -178,13 +179,23 @@ Categoría: ${product.category || ''}`
       }
     }
 
+    // Check if there are more products to process
+    const { count: remainingCount } = await supabaseClient
+      .from('vauner_products')
+      .select('*', { count: 'exact', head: true })
+      .not('translated_title', 'is', null)
+      .or('articulo.is.null,marca.is.null,modelo.is.null')
+
+    const hasMore = (remainingCount || 0) > 0
+
     return new Response(
       JSON.stringify({
         success: true,
         message: `Extraída información de ${processedCount.success} productos correctamente, ${processedCount.failed} fallidos`,
         processed: processedCount.success,
         failed: processedCount.failed,
-        remaining: products.length - processedCount.success - processedCount.failed
+        remaining: remainingCount || 0,
+        hasMore
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
