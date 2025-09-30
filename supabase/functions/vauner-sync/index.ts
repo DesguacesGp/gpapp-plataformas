@@ -59,19 +59,6 @@ Deno.serve(async (req) => {
     if (action === 'sync_products') {
       console.log('Syncing products - Starting authentication...')
       
-      // Delete all existing products before syncing
-      console.log('Deleting existing products...')
-      const { error: deleteError } = await supabaseClient
-        .from('vauner_products')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000') // Delete all
-      
-      if (deleteError) {
-        console.error('Error deleting products:', deleteError)
-      } else {
-        console.log('Existing products deleted successfully')
-      }
-      
       try {
         // Step 1: Authenticate with Vauner API
         const authUrl = `${vaunerUrl}/service/authenticate.php?user=${encodeURIComponent(vaunerUser)}&password=${encodeURIComponent(vaunerPassword)}`
@@ -176,6 +163,22 @@ Deno.serve(async (req) => {
             
             console.log(`Found ${categoryProducts.length} products with images in category ${categoryId}`)
             
+            // Get existing products to preserve translated fields
+            const skusInBatch = categoryProducts.map((p: any) => p.sku)
+            const { data: existingProducts } = await supabaseClient
+              .from('vauner_products')
+              .select('sku, translated_title, bullet_points')
+              .in('sku', skusInBatch)
+            
+            const existingMap = new Map(
+              (existingProducts || []).map(p => [p.sku, { 
+                translated_title: p.translated_title, 
+                bullet_points: p.bullet_points 
+              }])
+            )
+            
+            console.log(`Found ${existingMap.size} existing products to preserve translations`)
+            
             // Insert products in batches of 500 to avoid timeouts
             const batchSize = 500
             for (let i = 0; i < categoryProducts.length; i += batchSize) {
@@ -183,22 +186,28 @@ Deno.serve(async (req) => {
               const { error: batchError } = await supabaseClient
                 .from('vauner_products')
                 .upsert(
-                  batch.map((p: any) => ({
-                    sku: p.sku,
-                    description: p.description,
-                    stock: p.stock,
-                    price: p.price,
-                    has_image: p.has_image,
-                    category: p.category,
-                    raw_data: p.raw_data
-                  })),
+                  batch.map((p: any) => {
+                    const existing = existingMap.get(p.sku)
+                    return {
+                      sku: p.sku,
+                      description: p.description,
+                      stock: p.stock,
+                      price: p.price,
+                      has_image: p.has_image,
+                      category: p.category,
+                      raw_data: p.raw_data,
+                      // Preserve existing translations if they exist
+                      ...(existing?.translated_title && { translated_title: existing.translated_title }),
+                      ...(existing?.bullet_points && { bullet_points: existing.bullet_points })
+                    }
+                  }),
                   { onConflict: 'sku' }
                 )
               
               if (batchError) {
                 console.error(`Error inserting batch ${i}-${i+batchSize}:`, batchError)
               } else {
-                console.log(`Inserted batch ${i}-${i+batchSize} (${batch.length} products)`)
+                console.log(`Upserted batch ${i}-${i+batchSize} (${batch.length} products)`)
               }
             }
             
