@@ -6,6 +6,37 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Heartbeat interval (30 seconds)
+const HEARTBEAT_INTERVAL = 30000
+let heartbeatTimer: number | null = null
+
+// Function to update heartbeat
+async function updateHeartbeat(supabaseClient: any, queueId: string) {
+  try {
+    await supabaseClient
+      .from('processing_queue')
+      .update({ last_heartbeat: new Date().toISOString() })
+      .eq('id', queueId)
+  } catch (error) {
+    console.error('Failed to update heartbeat:', error)
+  }
+}
+
+// Function to start heartbeat
+function startHeartbeat(supabaseClient: any, queueId: string) {
+  heartbeatTimer = setInterval(() => {
+    updateHeartbeat(supabaseClient, queueId)
+  }, HEARTBEAT_INTERVAL) as unknown as number
+}
+
+// Function to stop heartbeat
+function stopHeartbeat() {
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer)
+    heartbeatTimer = null
+  }
+}
+
 const DICTIONARY = {
   'DRT': 'Derecho',
   'ESQ': 'Izquierdo',
@@ -70,16 +101,20 @@ Deno.serve(async (req) => {
     
     console.log(`Processing batch - ProductIds: ${productsToProcess?.length}, QueueId: ${queueId}`)
     
-    // If queueId provided, update queue status to processing with heartbeat
+    // If queueId provided, update queue status to processing and start heartbeat
     if (queueId) {
       await supabaseClient
         .from('processing_queue')
         .update({ 
           status: 'processing',
           started_at: new Date().toISOString(),
+          last_heartbeat: new Date().toISOString(),
           batch_size: productsToProcess?.length || 0
         })
         .eq('id', queueId)
+      
+      // Start heartbeat timer
+      startHeartbeat(supabaseClient, queueId)
     }
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')
@@ -334,23 +369,25 @@ Stock: ${product.stock}`
     
     console.log(`Batch complete. Processed: ${processedCount.success}, Failed: ${processedCount.failed}, Remaining: ${remainingCount || 0}`)
     
+    // Stop heartbeat
+    stopHeartbeat()
+    
     // Update current queue entry
     if (queueId) {
       await supabaseClient
         .from('processing_queue')
         .update({ 
-          status: remainingCount && remainingCount > 0 ? 'completed' : 'completed',
+          status: 'completed',
           processed_count: processedCount.success,
           completed_at: new Date().toISOString()
         })
         .eq('id', queueId)
     }
     
-    // If there are more products, create a new queue entry and trigger with retry logic
+    // If there are more products, create a new queue entry (cron will pick it up)
     if (remainingCount && remainingCount > 0) {
-      console.log('More products remaining, creating new queue entry and triggering next batch...')
+      console.log('More products remaining, creating new queue entry...')
       
-      // Create new queue entry for next batch (batch size now 10)
       const { data: newQueue } = await supabaseClient
         .from('processing_queue')
         .insert({
@@ -360,75 +397,12 @@ Stock: ${product.stock}`
         })
         .select()
         .single()
-      
-      // Trigger next batch with exponential backoff retry
-      const triggerNextBatch = async (retryCount = 0) => {
-        const maxRetries = 5
-        try {
-          console.log(`Triggering next batch (attempt ${retryCount + 1}/${maxRetries + 1}) with queue ID:`, newQueue?.id)
-          
-          const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/process-products`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ 
-              queueId: newQueue?.id
-            })
-          })
-          
-          if (response.ok) {
-            console.log('✅ Next batch triggered successfully')
-          } else {
-            const errorText = await response.text()
-            console.error(`❌ Failed to trigger next batch (${response.status}):`, errorText)
-            
-            // Retry with exponential backoff
-            if (retryCount < maxRetries) {
-              const waitTime = Math.pow(2, retryCount) * 2000 // 2s, 4s, 8s, 16s, 32s
-              console.log(`⏳ Retrying in ${waitTime}ms...`)
-              await new Promise(resolve => setTimeout(resolve, waitTime))
-              return triggerNextBatch(retryCount + 1)
-            }
-            
-            // Max retries reached, mark as error
-            if (newQueue?.id) {
-              await supabaseClient
-                .from('processing_queue')
-                .update({ 
-                  status: 'error',
-                  error_message: `Failed to trigger after ${maxRetries + 1} attempts: ${response.status}`
-                })
-                .eq('id', newQueue.id)
-            }
-          }
-        } catch (error) {
-          console.error(`❌ Error triggering next batch (attempt ${retryCount + 1}):`, error)
-          
-          // Retry with exponential backoff
-          if (retryCount < maxRetries) {
-            const waitTime = Math.pow(2, retryCount) * 2000
-            console.log(`⏳ Retrying in ${waitTime}ms...`)
-            await new Promise(resolve => setTimeout(resolve, waitTime))
-            return triggerNextBatch(retryCount + 1)
-          }
-          
-          // Max retries reached, mark as error
-          if (newQueue?.id) {
-            await supabaseClient
-              .from('processing_queue')
-              .update({ 
-                status: 'error',
-                error_message: error instanceof Error ? error.message : 'Unknown error'
-              })
-              .eq('id', newQueue.id)
-          }
-        }
+
+      if (newQueue) {
+        console.log(`✅ Created new queue entry: ${newQueue.id} - The cron job will pick it up automatically in max 2 minutes`)
       }
-      
-      // Trigger in background without awaiting
-      triggerNextBatch()
+    } else {
+      console.log('✅ All products processed!')
     }
 
     return new Response(
@@ -443,7 +417,11 @@ Stock: ${product.stock}`
     )
 
   } catch (error) {
-    console.error('Error in process-products:', error)
+    console.error('❌ Error in process-products:', error)
+    
+    // Stop heartbeat on error
+    stopHeartbeat()
+    
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -261,14 +261,20 @@ const Index = () => {
     try {
       toast.info('🔄 Reanudando procesamiento...');
       
-      const { data, error } = await supabase.functions.invoke('resume-processing');
+      const { data, error } = await supabase.functions.invoke('resume-processing', {
+        body: { triggered_by: 'manual' }
+      });
 
       if (error) throw error;
 
+      const recoveryInfo = data.recovery_events?.length > 0 
+        ? ` (${data.recovery_events.length} eventos de recuperación)` 
+        : '';
+
       if (data.remaining === 0) {
-        toast.success('✅ No hay productos pendientes de procesar');
+        toast.success('✅ No hay productos pendientes de procesar' + recoveryInfo);
       } else {
-        toast.success(`✅ Procesamiento reanudado. ${data.remaining} productos pendientes.`);
+        toast.success(`✅ Procesamiento reanudado. ${data.remaining} productos pendientes.` + recoveryInfo);
       }
       
       setTimeout(() => loadProducts(), 2000);

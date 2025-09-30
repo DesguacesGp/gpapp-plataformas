@@ -156,6 +156,7 @@ export type Database = {
           created_at: string
           error_message: string | null
           id: string
+          last_heartbeat: string | null
           last_product_id: string | null
           processed_count: number
           started_at: string | null
@@ -169,6 +170,7 @@ export type Database = {
           created_at?: string
           error_message?: string | null
           id?: string
+          last_heartbeat?: string | null
           last_product_id?: string | null
           processed_count?: number
           started_at?: string | null
@@ -182,6 +184,7 @@ export type Database = {
           created_at?: string
           error_message?: string | null
           id?: string
+          last_heartbeat?: string | null
           last_product_id?: string | null
           processed_count?: number
           started_at?: string | null
@@ -190,6 +193,41 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      processing_recovery_log: {
+        Row: {
+          created_at: string | null
+          id: string
+          message: string | null
+          products_remaining: number | null
+          queue_id: string | null
+          recovery_type: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          message?: string | null
+          products_remaining?: number | null
+          queue_id?: string | null
+          recovery_type: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          message?: string | null
+          products_remaining?: number | null
+          queue_id?: string | null
+          recovery_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "processing_recovery_log_queue_id_fkey"
+            columns: ["queue_id"]
+            isOneToOne: false
+            referencedRelation: "processing_queue"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vauner_config: {
         Row: {
