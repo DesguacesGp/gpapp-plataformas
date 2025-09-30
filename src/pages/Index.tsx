@@ -29,7 +29,6 @@ const Index = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [isResuming, setIsResuming] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
@@ -193,6 +192,13 @@ const Index = () => {
       if (error) throw error;
 
       toast.success(data.message || 'Productos sincronizados correctamente');
+      
+      // Automatically start processing after sync
+      toast.info('Iniciando procesamiento automático de IA...');
+      setTimeout(() => {
+        resumeProcessing();
+      }, 2000);
+      
       loadProducts();
     } catch (error: any) {
       console.error('Error syncing:', error);
@@ -202,30 +208,6 @@ const Index = () => {
     }
   };
 
-  const processProducts = async () => {
-    if (selectedIds.length === 0) {
-      toast.warning('Selecciona al menos un producto para procesar');
-      return;
-    }
-
-    setIsProcessing(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('process-products', {
-        body: { productIds: selectedIds }
-      });
-
-      if (error) throw error;
-
-      toast.success(data.message || 'Productos procesados correctamente');
-      loadProducts();
-      setSelectedIds([]);
-    } catch (error: any) {
-      console.error('Error processing products:', error);
-      toast.error('Error al procesar productos: ' + error.message);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
 
   const resumeProcessing = async () => {
     setIsResuming(true);
@@ -237,6 +219,15 @@ const Index = () => {
       if (error) throw error;
 
       toast.success(data.message || 'Procesamiento IA reanudado');
+      
+      // After processing, extract info automatically
+      if (data.processed > 0) {
+        toast.info('Extrayendo información automáticamente...');
+        setTimeout(() => {
+          extractProductInfo();
+        }, 3000);
+      }
+      
       loadProducts();
     } catch (error: any) {
       console.error('Error resuming processing:', error);
@@ -254,6 +245,15 @@ const Index = () => {
       if (error) throw error;
       
       toast.success(data.message || 'Información extraída correctamente');
+      
+      // If there are still products remaining, continue extracting
+      if (data.remaining && data.remaining > 0) {
+        toast.info(`Quedan ${data.remaining} productos, continuando...`);
+        setTimeout(() => {
+          extractProductInfo();
+        }, 3000);
+      }
+      
       setTimeout(() => loadProducts(), 2000);
     } catch (error: any) {
       console.error('Error extracting product info:', error);
@@ -518,14 +518,6 @@ const Index = () => {
                 >
                   <Database className={`mr-2 h-4 w-4 ${isExtracting ? 'animate-pulse' : ''}`} />
                   {isExtracting ? 'Extrayendo...' : 'Extraer Info'}
-                </Button>
-                <Button
-                  onClick={processProducts}
-                  variant="secondary"
-                  disabled={selectedIds.length === 0 || isProcessing}
-                >
-                  <Sparkles className={`mr-2 h-4 w-4 ${isProcessing ? 'animate-pulse' : ''}`} />
-                  {isProcessing ? 'Procesando...' : 'Procesar Selección'}
                 </Button>
                 <Button
                   onClick={exportSelected}

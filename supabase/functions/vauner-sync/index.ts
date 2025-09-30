@@ -35,76 +35,62 @@ Deno.serve(async (req) => {
     if (action === 'resume_processing') {
       console.log('Resuming AI processing for unprocessed products...')
       
-      const { count: unprocessedCount } = await supabaseClient
+      // Get up to 50 unprocessed products
+      const { data: unprocessedProducts, error: countError } = await supabaseClient
         .from('vauner_products')
-        .select('*', { count: 'exact', head: true })
+        .select('id')
         .is('translated_title', null)
+        .limit(50)
       
-      console.log(`Found ${unprocessedCount || 0} total unprocessed products`)
+      if (countError) {
+        console.error('Error fetching unprocessed products:', countError)
+        throw countError
+      }
       
-      if (!unprocessedCount || unprocessedCount === 0) {
+      const unprocessedCount = unprocessedProducts?.length || 0
+      console.log(`Found ${unprocessedCount} unprocessed products to process`)
+      
+      if (unprocessedCount === 0) {
         return new Response(
           JSON.stringify({ 
             success: true, 
-            message: 'No hay productos pendientes de procesar' 
+            message: 'No hay productos pendientes de procesar',
+            processed: 0
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
       
-      // Process in batches of 25
-      const batchSize = 25
-      let processed = 0
+      // Get the product IDs to process
+      const productIds = unprocessedProducts.map(p => p.id)
       
-      const processNextBatch = async () => {
-        const { data: batch, error: batchError } = await supabaseClient
-          .from('vauner_products')
-          .select('id')
-          .is('translated_title', null)
-          .limit(batchSize)
-        
-        if (batchError || !batch || batch.length === 0) {
-          console.log(`Processing complete. Total processed: ${processed}`)
-          return
-        }
-        
-        const productIds = batch.map(p => p.id)
-        
-        // Trigger processing for this batch
-        fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/process-products`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ productIds })
-        }).then(response => {
-          if (response.ok) {
-            processed += batch.length
-            console.log(`Batch processed successfully. Total: ${processed}/${unprocessedCount}`)
-          } else {
-            console.error('Failed to process batch:', response.status)
-          }
-        }).catch(err => {
-          console.error('Error processing batch:', err)
-        })
-        
-        // 10 second delay between batches
-        await new Promise(resolve => setTimeout(resolve, 10000))
-        
-        await processNextBatch()
+      // Trigger processing for this batch
+      console.log(`Triggering process-products for ${productIds.length} products`)
+      const processResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/process-products`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ productIds })
+      })
+      
+      if (!processResponse.ok) {
+        const errorText = await processResponse.text()
+        console.error('Failed to process batch:', processResponse.status, errorText)
+        throw new Error(`Failed to process products: ${errorText}`)
       }
       
-      // Start processing loop in background
-      processNextBatch().catch(err => {
-        console.error('Error in processing loop:', err)
-      })
+      const processData = await processResponse.json()
+      console.log('Processing result:', processData)
       
       return new Response(
         JSON.stringify({ 
           success: true, 
           unprocessedCount,
-          message: `Procesamiento IA reanudado para ${unprocessedCount} productos pendientes` 
+          message: `Procesando ${unprocessedCount} productos con IA`,
+          processed: unprocessedCount,
+          details: processData
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
