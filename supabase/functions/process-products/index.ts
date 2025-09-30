@@ -167,18 +167,36 @@ Tu tarea es:
    * "✓ Fabricado con materiales de alta resistencia UV y golpes - Óptica de policarbonato resistente y carcasa duradera que soporta condiciones climáticas extremas"
    * "⭐ Calidad OEM equivalente testada - Cumple normativas europeas homologación, aftermarket premium testado para asegurar durabilidad y rendimiento superior"
 
-4. EXTRAER información estructurada del producto:
-   - articulo: El TIPO DE PIEZA (ej: "Faro", "Piloto", "Retrovisor", "Elevalunas", "Parachoques", "Cerradura", etc.)
-   - marca: La MARCA del vehículo (ej: "Ford", "Volkswagen", "Seat", "Renault", "Fiat", "Citroen", "Nissan", etc.)
-   - modelo: El MODELO específico del vehículo (ej: "Focus", "Golf", "Leon", "Modus", "Ducato", "Micra", etc.)
+4. EXTRAER información estructurada del producto (CRÍTICO - ANALIZA CUIDADOSAMENTE):
+   
+   a) articulo: El TIPO DE PIEZA en español (ej: "Faro", "Piloto", "Retrovisor", "Elevalunas", "Parachoques", "Cerradura", "Paragolpes", "Aleta", "Cristal", "Maneta", etc.)
+      - Debe ser un nombre genérico del tipo de pieza
+      - En español, sin abreviaturas
+   
+   b) marca: La MARCA del vehículo (ej: "Ford", "Volkswagen", "Seat", "Renault", "Fiat", "Citroen", "Nissan", "Audi", "Mercedes", "BMW", etc.)
+      - Solo el nombre de la marca, sin modelos
+      - Primera letra en mayúscula
+   
+   c) modelo: El MODELO específico del vehículo (ej: "Focus", "Golf", "Leon", "Modus", "Ducato", "Micra", "A6", "Clase E", etc.)
+      - Solo el nombre del modelo
+      - Sin años ni generaciones
+   
+   d) año_desde: El año de inicio extraído de la descripción (formato: YYYY)
+      - Busca patrones como "97-*", "2010-*", "05-", "desde 2004", etc. en la descripción o SKU
+      - Convierte años de 2 dígitos a 4 dígitos (97 → 1997, 05 → 2005)
+      - Si es menor a 80, asume 2000s (05 → 2005), si es 80 o mayor asume 1900s (97 → 1997)
+      - Si encuentras rango como "2010-2015", usa el primer año (2010)
+
+Si no puedes determinar algún campo con alta seguridad, devuelve null para ese campo.
 
 Responde SOLO con un JSON válido en este formato exacto:
 {
   "translated_title": "título SEO largo y descriptivo (150-200 caracteres)",
   "bullet_points": ["bullet 1 (150-200 chars)", "bullet 2", "bullet 3", "bullet 4", "bullet 5"],
-  "articulo": "tipo de pieza",
-  "marca": "marca del vehículo",
-  "modelo": "modelo del vehículo"
+  "articulo": "tipo de pieza o null",
+  "marca": "marca del vehículo o null",
+  "modelo": "modelo del vehículo o null",
+  "año_desde": "YYYY o null"
 }
 
 NO agregues texto adicional, SOLO el JSON.`
@@ -260,7 +278,8 @@ Stock: ${product.stock}`
             bullet_points: processedData.bullet_points,
             articulo: processedData.articulo || null,
             marca: processedData.marca || null,
-            modelo: processedData.modelo || null
+            modelo: processedData.modelo || null,
+            año_desde: processedData.año_desde || null
           })
           .eq('id', product.id)
 
