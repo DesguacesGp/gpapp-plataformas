@@ -27,6 +27,9 @@ interface Product {
   translated_title: string | null;
   bullet_points: string[] | null;
   final_price?: number;
+  articulo: string | null;
+  marca: string | null;
+  modelo: string | null;
 }
 
 interface ProductsTableProps {
@@ -257,13 +260,22 @@ export const ProductsTable = ({
               <TableHead>
                 <SortButton field="sku">SKU</SortButton>
               </TableHead>
-              <TableHead>
+              <TableHead className="w-32">
+                <SortButton field="articulo">Artículo</SortButton>
+              </TableHead>
+              <TableHead className="w-24">
+                <SortButton field="marca">Marca</SortButton>
+              </TableHead>
+              <TableHead className="w-24">
+                <SortButton field="modelo">Modelo</SortButton>
+              </TableHead>
+              <TableHead className="w-40">
                 <SortButton field="description">Descripción</SortButton>
               </TableHead>
-              <TableHead>
+              <TableHead className="w-32">
                 <SortButton field="ai_processed">Título Traducido</SortButton>
               </TableHead>
-              <TableHead className="font-semibold">Bullet Points</TableHead>
+              <TableHead className="font-semibold w-32">Bullets</TableHead>
               <TableHead className="text-center">
                 <SortButton field="stock">Stock</SortButton>
               </TableHead>
@@ -276,7 +288,7 @@ export const ProductsTable = ({
               <TableHead className="text-center">
                 <SortButton field="has_image">Imagen</SortButton>
               </TableHead>
-              <TableHead>
+              <TableHead className="w-24">
                 <SortButton field="category">Categoría</SortButton>
               </TableHead>
             </TableRow>
@@ -284,7 +296,7 @@ export const ProductsTable = ({
           <TableBody>
             {products.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
                   No hay productos que mostrar
                 </TableCell>
               </TableRow>
@@ -298,26 +310,27 @@ export const ProductsTable = ({
                     />
                   </TableCell>
                   <TableCell className="font-medium">{product.sku}</TableCell>
-                  <TableCell className="max-w-md truncate">{product.description}</TableCell>
-                  <TableCell className="max-w-md">
+                  <TableCell className="text-sm truncate max-w-[130px]">{product.articulo || "-"}</TableCell>
+                  <TableCell className="text-sm truncate max-w-[100px]">{product.marca || "-"}</TableCell>
+                  <TableCell className="text-sm truncate max-w-[100px]">{product.modelo || "-"}</TableCell>
+                  <TableCell className="text-xs truncate max-w-[160px]">{product.description}</TableCell>
+                  <TableCell className="max-w-[130px]">
                     {product.translated_title ? (
-                      <span className="text-sm">{product.translated_title}</span>
+                      <span className="text-xs truncate block">{product.translated_title}</span>
                     ) : (
-                      <Badge variant="outline">Sin procesar</Badge>
+                      <Badge variant="outline" className="text-xs">Sin procesar</Badge>
                     )}
                   </TableCell>
-                  <TableCell className="max-w-xs">
+                  <TableCell className="max-w-[130px]">
                     {product.bullet_points && product.bullet_points.length > 0 ? (
-                      <ul className="text-xs space-y-1 list-disc list-inside">
-                        {product.bullet_points.slice(0, 2).map((bullet, idx) => (
-                          <li key={idx} className="truncate">{bullet}</li>
-                        ))}
-                        {product.bullet_points.length > 2 && (
-                          <li className="text-muted-foreground">+{product.bullet_points.length - 2} más...</li>
+                      <div className="text-xs">
+                        <span className="truncate block">{product.bullet_points[0]}</span>
+                        {product.bullet_points.length > 1 && (
+                          <span className="text-muted-foreground text-[10px]">+{product.bullet_points.length - 1}</span>
                         )}
-                      </ul>
+                      </div>
                     ) : (
-                      <Badge variant="outline">Sin procesar</Badge>
+                      <Badge variant="outline" className="text-xs">Sin procesar</Badge>
                     )}
                   </TableCell>
                   <TableCell className="text-center">
@@ -337,7 +350,7 @@ export const ProductsTable = ({
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline">{product.category || "Sin categoría"}</Badge>
+                    <Badge variant="outline" className="text-xs truncate max-w-[100px]">{product.category || "Sin categoría"}</Badge>
                   </TableCell>
                 </TableRow>
               ))

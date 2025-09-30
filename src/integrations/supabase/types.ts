@@ -97,12 +97,15 @@ export type Database = {
       }
       vauner_products: {
         Row: {
+          articulo: string | null
           bullet_points: string[] | null
           category: string | null
           created_at: string
           description: string
           has_image: boolean
           id: string
+          marca: string | null
+          modelo: string | null
           price: number
           raw_data: Json | null
           sku: string
@@ -111,12 +114,15 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          articulo?: string | null
           bullet_points?: string[] | null
           category?: string | null
           created_at?: string
           description: string
           has_image?: boolean
           id?: string
+          marca?: string | null
+          modelo?: string | null
           price: number
           raw_data?: Json | null
           sku: string
@@ -125,12 +131,15 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          articulo?: string | null
           bullet_points?: string[] | null
           category?: string | null
           created_at?: string
           description?: string
           has_image?: boolean
           id?: string
+          marca?: string | null
+          modelo?: string | null
           price?: number
           raw_data?: Json | null
           sku?: string

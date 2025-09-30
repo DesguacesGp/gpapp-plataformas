@@ -18,6 +18,9 @@ interface Product {
   translated_title: string | null;
   bullet_points: string[] | null;
   final_price?: number;
+  articulo: string | null;
+  marca: string | null;
+  modelo: string | null;
 }
 
 const Index = () => {
