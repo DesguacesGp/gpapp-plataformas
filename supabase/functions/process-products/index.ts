@@ -193,7 +193,7 @@ Precio: ${product.price}€
 Stock: ${product.stock}`
               }
             ],
-            max_completion_tokens: 1000
+            max_completion_tokens: 2500
           }),
           })
 
@@ -223,11 +223,18 @@ Stock: ${product.stock}`
         }
 
         const aiData = await aiResponse.json()
-        console.log(`AI Response for ${product.sku}:`, JSON.stringify(aiData))
+        console.log(`AI Response for ${product.sku} - Tokens used:`, {
+          prompt: aiData.usage?.prompt_tokens,
+          completion: aiData.usage?.completion_tokens,
+          reasoning: aiData.usage?.completion_tokens_details?.reasoning_tokens,
+          total: aiData.usage?.total_tokens
+        })
+        
         const content = aiData.choices?.[0]?.message?.content
 
         if (!content) {
-          console.error(`No content from AI for ${product.sku}. Full response:`, JSON.stringify(aiData))
+          console.error(`No content from AI for ${product.sku}. Finish reason:`, aiData.choices?.[0]?.finish_reason)
+          console.error(`Full AI response:`, JSON.stringify(aiData))
           processedCount.failed++
           continue
         }
