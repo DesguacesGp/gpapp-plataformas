@@ -237,75 +237,85 @@ const AmazonConnector = () => {
 
         // Asignar atributos específicos según el tipo y descripción
         const desc = (product.description || '').toLowerCase();
+        const title = (product.translated_title || '').toLowerCase();
+        const fullText = (desc + ' ' + title).toLowerCase();
         
         if (feedType === 'mirror') {
           // Determinar posición del espejo
-          if (desc.includes('esquerdo') || desc.includes('izquierdo') || desc.includes('left')) {
+          if (fullText.includes('esquerdo') || fullText.includes('izquierdo') || fullText.includes('left')) {
             configData.mirror_position = 'Izquierda';
-          } else if (desc.includes('direito') || desc.includes('derecho') || desc.includes('right')) {
+          } else if (fullText.includes('direito') || fullText.includes('derecho') || fullText.includes('right')) {
             configData.mirror_position = 'Derecha';
           } else {
-            configData.mirror_position = 'Izquierda';
+            configData.mirror_position = '';
           }
           
-          configData.mirror_heated = desc.includes('calefacción') || desc.includes('heated');
-          configData.mirror_folding = desc.includes('plegable') || desc.includes('rebativel');
-          configData.mirror_turn_signal = desc.includes('intermitente') || desc.includes('pisca');
+          configData.mirror_heated = fullText.includes('calefacción') || fullText.includes('heated') || fullText.includes('aquecido');
+          configData.mirror_folding = fullText.includes('plegable') || fullText.includes('rebativel') || fullText.includes('abatible');
+          configData.mirror_turn_signal = fullText.includes('intermitente') || fullText.includes('pisca') || fullText.includes('indicator');
           
         } else if (feedType === 'vehicle_light_assembly') {
-          // Determinar tipo de luz
-          if (desc.includes('led')) {
+          // Para FAROLINS (pilotos), SIEMPRE es trasera
+          if (product.category === 'ILUMINACAO(FAROLINS)-VIATURAS EUROPEIAS') {
+            configData.light_placement = 'Parte trasera';
+            
+            // Determinar lado solo si está explícito
+            if (fullText.includes('esquerdo') || fullText.includes('izquierdo') || fullText.includes('left')) {
+              configData.light_placement = 'Parte trasera izquierda';
+            } else if (fullText.includes('direito') || fullText.includes('derecho') || fullText.includes('right')) {
+              configData.light_placement = 'Parte trasera derecha';
+            }
+          } else {
+            // Para otros tipos de iluminación, determinar según descripción
+            if (fullText.includes('delantero') || fullText.includes('dianteiro') || fullText.includes('faro') || fullText.includes('headlight')) {
+              configData.light_placement = 'Delantero';
+            } else if (fullText.includes('trasero') || fullText.includes('traseira') || fullText.includes('rear')) {
+              configData.light_placement = 'Parte trasera';
+            } else {
+              configData.light_placement = '';
+            }
+          }
+          
+          // Tipo de luz: SOLO asignar si está EXPLÍCITAMENTE en el texto
+          if (fullText.includes('led')) {
             configData.light_type = 'LED';
-          } else if (desc.includes('halogen') || desc.includes('halogeno')) {
+          } else if (fullText.includes('halogen') || fullText.includes('halogeno') || fullText.includes('halógeno')) {
             configData.light_type = 'Halógeno';
+          } else if (fullText.includes('xenon') || fullText.includes('xenón')) {
+            configData.light_type = 'Xenón';
           } else {
-            configData.light_type = 'LED';
-          }
-          
-          // Determinar posición
-          if (desc.includes('trasero') || desc.includes('traseira') || desc.includes('piloto')) {
-            configData.light_placement = 'Parte trasera';
-          } else if (desc.includes('delantero') || desc.includes('dianteiro') || desc.includes('faro')) {
-            configData.light_placement = 'Delantero';
-          } else {
-            configData.light_placement = 'Parte trasera';
-          }
-          
-          // Determinar lado
-          if (desc.includes('esquerdo') || desc.includes('izquierdo') || desc.includes('left')) {
-            configData.light_placement = configData.light_placement + ' izquierda';
-          } else if (desc.includes('direito') || desc.includes('derecho') || desc.includes('right')) {
-            configData.light_placement = configData.light_placement + ' derecha';
+            // No asumir nada, dejar vacío
+            configData.light_type = '';
           }
           
         } else if (feedType === 'window_regulator') {
-          if (desc.includes('esquerdo') || desc.includes('izquierdo') || desc.includes('left')) {
+          if (fullText.includes('esquerdo') || fullText.includes('izquierdo') || fullText.includes('left')) {
             configData.window_side = 'Izquierda';
-          } else if (desc.includes('direito') || desc.includes('derecho') || desc.includes('right')) {
+          } else if (fullText.includes('direito') || fullText.includes('derecho') || fullText.includes('right')) {
             configData.window_side = 'Derecha';
           } else {
-            configData.window_side = 'Izquierda';
+            configData.window_side = '';
           }
           
           configData.window_doors = '4';
-          configData.window_mechanism = desc.includes('electr') ? 'Eléctrico' : 'Manual';
+          configData.window_mechanism = (fullText.includes('electr') || fullText.includes('eléctrico')) ? 'Eléctrico' : 'Manual';
           
         } else if (feedType === 'door_handle') {
-          if (desc.includes('delantero') || desc.includes('dianteiro')) {
+          if (fullText.includes('delantero') || fullText.includes('dianteiro') || fullText.includes('front')) {
             configData.door_placement = 'Delantero';
-          } else if (desc.includes('trasero') || desc.includes('traseira')) {
+          } else if (fullText.includes('trasero') || fullText.includes('traseira') || fullText.includes('rear')) {
             configData.door_placement = 'Trasero';
           } else {
-            configData.door_placement = 'Delantero';
+            configData.door_placement = '';
           }
           
-          if (desc.includes('esquerdo') || desc.includes('izquierdo') || desc.includes('left')) {
-            configData.door_placement = configData.door_placement + ' izquierdo';
-          } else if (desc.includes('direito') || desc.includes('derecho') || desc.includes('right')) {
-            configData.door_placement = configData.door_placement + ' derecho';
+          if (fullText.includes('esquerdo') || fullText.includes('izquierdo') || fullText.includes('left')) {
+            configData.door_placement = configData.door_placement ? configData.door_placement + ' izquierdo' : 'Izquierdo';
+          } else if (fullText.includes('direito') || fullText.includes('derecho') || fullText.includes('right')) {
+            configData.door_placement = configData.door_placement ? configData.door_placement + ' derecho' : 'Derecho';
           }
           
-          configData.door_material = desc.includes('metal') ? 'Metal' : 'Plástico';
+          configData.door_material = fullText.includes('metal') || fullText.includes('aluminio') ? 'Metal' : 'Plástico';
         }
 
         const { error } = await supabase
