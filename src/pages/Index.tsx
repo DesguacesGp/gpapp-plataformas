@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { RefreshCw, Settings, Download, LogOut, Sparkles, DollarSign } from "lucide-react";
+import { RefreshCw, Settings, Download, LogOut, Sparkles, DollarSign, Package } from "lucide-react";
 import { ProductsTable } from "@/components/ProductsTable";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -475,6 +475,9 @@ const Index = () => {
           <div className="flex items-center justify-between mb-2">
             <h1 className="text-4xl font-bold tracking-tight">Panel Vauner</h1>
             <div className="flex gap-2">
+              <Button variant="outline" size="icon" onClick={() => navigate("/amazon-connector")}>
+                <Package className="h-4 w-4" />
+              </Button>
               <Button variant="outline" size="icon" onClick={() => navigate("/pricing")}>
                 <DollarSign className="h-4 w-4" />
               </Button>

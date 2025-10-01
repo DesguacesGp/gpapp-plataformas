@@ -14,6 +14,74 @@ export type Database = {
   }
   public: {
     Tables: {
+      amazon_product_config: {
+        Row: {
+          created_at: string
+          door_material: string | null
+          door_placement: string | null
+          feed_product_type: string
+          id: string
+          light_placement: string | null
+          light_type: string | null
+          mirror_folding: boolean | null
+          mirror_heated: boolean | null
+          mirror_position: string | null
+          mirror_turn_signal: boolean | null
+          product_id: string
+          recommended_browse_node: string | null
+          updated_at: string
+          window_doors: string | null
+          window_mechanism: string | null
+          window_side: string | null
+        }
+        Insert: {
+          created_at?: string
+          door_material?: string | null
+          door_placement?: string | null
+          feed_product_type: string
+          id?: string
+          light_placement?: string | null
+          light_type?: string | null
+          mirror_folding?: boolean | null
+          mirror_heated?: boolean | null
+          mirror_position?: string | null
+          mirror_turn_signal?: boolean | null
+          product_id: string
+          recommended_browse_node?: string | null
+          updated_at?: string
+          window_doors?: string | null
+          window_mechanism?: string | null
+          window_side?: string | null
+        }
+        Update: {
+          created_at?: string
+          door_material?: string | null
+          door_placement?: string | null
+          feed_product_type?: string
+          id?: string
+          light_placement?: string | null
+          light_type?: string | null
+          mirror_folding?: boolean | null
+          mirror_heated?: boolean | null
+          mirror_position?: string | null
+          mirror_turn_signal?: boolean | null
+          product_id?: string
+          recommended_browse_node?: string | null
+          updated_at?: string
+          window_doors?: string | null
+          window_mechanism?: string | null
+          window_side?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "amazon_product_config_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "vauner_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brand_equivalences: {
         Row: {
           confidence_level: string
