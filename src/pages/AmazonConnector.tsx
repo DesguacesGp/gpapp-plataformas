@@ -46,11 +46,15 @@ const CATEGORY_TO_FEED_TYPE: Record<string, string> = {
   'ELEVADORES-PUNHOS-COMANDOS-FECHADURAS': 'window_regulator',
 };
 
-// Browse nodes de Amazon según plantilla oficial (Vehicle Light Assembly)
-// Nodos más comunes para diferentes tipos de luces
+// Browse nodes de Amazon según plantilla oficial y categorías específicas
+// Nodos más comunes para diferentes tipos de productos
 const BROWSE_NODES_BY_TYPE: Record<string, string> = {
   // Espejos retrovisores
-  'mirror': '2425076031', // Montaje de faros (genérico para espejos)
+  'mirror_completo': '5029368031', // Espejos retrovisores completos
+  'mirror_angulo_muerto': '5029368031', // Retrovisores de ángulo muerto (mismo nodo)
+  'mirror_lateral': '2425404031', // Espejos laterales (motos)
+  'mirror_interior': '2424810031', // Espejos interiores
+  'mirror_default': '5029368031', // Espejos retrovisores y partes de repuesto (genérico)
   
   // Luces traseras y pilotos
   'luz_trasera': '2425091031', // Montaje de luces traseras
@@ -69,21 +73,34 @@ const BROWSE_NODES_BY_TYPE: Record<string, string> = {
   'luz_freno': '2425086031', // Tercera luz de freno
   'brake_light': '2425234031', // Luces de freno (motos)
   
-  // Elevalunas y otros
-  'window_regulator': '2425082031', // Iluminación interior
-  'door_handle': '2425088031', // Luces de matrícula
+  // Elevalunas, interruptores y comandos
+  'window_regulator': '2424811031', // Tiradores de ventanilla y elevalunas
+  'interruptor_ventana': '2424811031', // Ventana eléctrica (mismo nodo)
+  'elementos_mando': '2424789031', // Elementos de mando (acondicionamiento interior)
+  'interruptor_boton': '2424813031', // Interruptores de botón
+  
+  // Cerraduras y dispositivos de cierre
+  'cerradura': '2425404031', // Dispositivos de cierre antirrobo
+  'door_handle': '2424811031', // Manetas (mismo que elevalunas por categoría)
   
   // Genérico
   'default': '2425091031', // Montaje de luces traseras (más común)
 };
 
-// Función para determinar el browse node específico basado en descripción
+// Función para determinar el browse node específico basado en descripción y categoría
 const getBrowseNodeFromDescription = (description: string, category: string): string => {
   const desc = description.toLowerCase();
   
-  // Para espejos
+  // Para espejos retrovisores
   if (category === 'ESPELHOS RETROVISORES') {
-    return BROWSE_NODES_BY_TYPE['mirror'];
+    if (desc.includes('interior')) {
+      return BROWSE_NODES_BY_TYPE['mirror_interior'];
+    }
+    if (desc.includes('lateral')) {
+      return BROWSE_NODES_BY_TYPE['mirror_lateral'];
+    }
+    // Por defecto: espejos completos
+    return BROWSE_NODES_BY_TYPE['mirror_completo'];
   }
   
   // Para iluminación, analizar la descripción
@@ -104,14 +121,25 @@ const getBrowseNodeFromDescription = (description: string, category: string): st
     return BROWSE_NODES_BY_TYPE['conjunto_piloto'];
   }
   
-  // Para elevalunas
+  // Para elevalunas, comandos, cerraduras
   if (category === 'ELEVADORES-PUNHOS-COMANDOS-FECHADURAS') {
-    if (desc.includes('eleva') || desc.includes('vidro')) {
+    if (desc.includes('eleva') || desc.includes('vidro') || desc.includes('ventana')) {
       return BROWSE_NODES_BY_TYPE['window_regulator'];
     }
-    if (desc.includes('cerradura') || desc.includes('maneta') || desc.includes('puxador')) {
+    if (desc.includes('interruptor') || desc.includes('botão') || desc.includes('boton')) {
+      return BROWSE_NODES_BY_TYPE['interruptor_boton'];
+    }
+    if (desc.includes('comando') || desc.includes('mando')) {
+      return BROWSE_NODES_BY_TYPE['elementos_mando'];
+    }
+    if (desc.includes('cerradura') || desc.includes('fechadura') || desc.includes('bloqueo')) {
+      return BROWSE_NODES_BY_TYPE['cerradura'];
+    }
+    if (desc.includes('maneta') || desc.includes('puxador') || desc.includes('tirador')) {
       return BROWSE_NODES_BY_TYPE['door_handle'];
     }
+    // Por defecto: elevalunas
+    return BROWSE_NODES_BY_TYPE['window_regulator'];
   }
   
   return BROWSE_NODES_BY_TYPE['default'];
