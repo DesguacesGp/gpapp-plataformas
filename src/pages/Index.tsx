@@ -329,82 +329,92 @@ const Index = () => {
 
     const selectedProducts = products.filter(p => selectedIds.includes(p.id));
     
-    // Generate Amazon flat file data
+    // Generate Amazon flat file data with official VEHICLE_LIGHT_ASSEMBLY template columns
     const amazonData = selectedProducts.map(product => {
-      // Generate keywords from title and description
-      const keywords = [
-        product.category,
-        'recambio',
-        'compatible',
-        'OEM',
-        'aftermarket',
-        'calidad'
-      ].filter(Boolean).join(', ');
+      const cleanText = (text: string | null | undefined) => {
+        if (!text) return '';
+        return text.replace(/\t/g, ' ').replace(/\n/g, ' ').replace(/\r/g, ' ').trim();
+      };
 
       return {
-        sku: product.sku,
-        'product-id': '',
-        'product-id-type': '',
-        brand_name: 'Recambify',
-        item_name: product.translated_title || product.description,
+        item_sku: cleanText(product.sku),
+        item_name: cleanText(product.translated_title || product.description),
         external_product_id: '',
-        recommended_browse_node: '2425091031',
-        quantity: product.stock,
+        external_product_id_type: '',
+        brand_name: 'Recambify',
+        manufacturer: 'INNOVA RECAMBIOS SL',
+        part_number: cleanText(product.sku),
+        product_description: cleanText('Importador: INNOVA RECAMBIOS SL, CIF B06720221, AVDA FEDERICO MAYOR ZARAGOZA NAVE 8, 06006 Badajoz, Tel: 924114454'),
+        item_type: 'vehicle-light-assembly',
+        feed_product_type: 'Automotive',
         standard_price: (product.final_price || product.price).toFixed(2),
-        condition_type: 'new',
-        bullet_point1: product.bullet_points?.[0] || '',
-        bullet_point2: product.bullet_points?.[1] || '',
-        bullet_point3: product.bullet_points?.[2] || '',
-        bullet_point4: product.bullet_points?.[3] || '',
-        bullet_point5: product.bullet_points?.[4] || '',
-        generic_keywords: keywords,
+        quantity: product.stock.toString(),
+        condition_type: 'New',
+        condition_note: '',
+        bullet_point1: cleanText(product.bullet_points?.[0] || ''),
+        bullet_point2: cleanText(product.bullet_points?.[1] || ''),
+        bullet_point3: cleanText(product.bullet_points?.[2] || ''),
+        bullet_point4: cleanText(product.bullet_points?.[3] || ''),
+        bullet_point5: cleanText(product.bullet_points?.[4] || ''),
+        generic_keywords: cleanText([product.category, 'recambio', 'compatible', 'OEM', 'aftermarket'].filter(Boolean).join(', ')),
         main_image_url: '',
         other_image_url1: '',
         other_image_url2: '',
         other_image_url3: '',
         other_image_url4: '',
         other_image_url5: '',
-        part_number: product.sku,
-        compatible_vehicle: product.category || '',
-        manufacturer: 'INNOVA RECAMBIOS SL',
-        importer: 'INNOVA RECAMBIOS SL, CIF B06720221, AVDA FEDERICO MAYOR ZARAGOZA NAVE 8, 06006 Badajoz, Tel: 924114454',
-        country_of_origin: 'China',
-        ce_compliance: 'No',
-        safety_warnings: 'Ninguno'
+        country_of_origin: 'CN',
+        ce_marking: 'No',
+        safety_warning1: 'Ninguno',
+        safety_warning2: '',
+        safety_warning3: '',
+        vehicle_make: cleanText(product.marca || ''),
+        vehicle_model: cleanText(product.modelo || ''),
+        vehicle_year_from: cleanText(product.año_desde || ''),
+        vehicle_year_to: cleanText(product.año_hasta || ''),
+        fitment_type: 'Direct Replacement',
+        assembly_type: 'Vehicle Light Assembly',
+        light_type: '',
+        light_color: '',
+        placement: '',
+        number_of_pieces: '1',
+        warranty_description: '2 años garantía',
+        fulfillment_center_id: ''
       };
     });
 
-    // Generate CSV with tab delimiters (Amazon format)
+    // Official Amazon VEHICLE_LIGHT_ASSEMBLY template headers
     const headers = [
-      'sku', 'product-id', 'product-id-type', 'brand_name', 'item_name',
-      'external_product_id', 'recommended_browse_node', 'quantity', 'standard_price',
-      'condition_type', 'bullet_point1', 'bullet_point2', 'bullet_point3',
-      'bullet_point4', 'bullet_point5', 'generic_keywords', 'main_image_url',
-      'other_image_url1', 'other_image_url2', 'other_image_url3', 'other_image_url4',
-      'other_image_url5', 'part_number', 'compatible_vehicle',
-      'manufacturer', 'importer', 'country_of_origin', 'ce_compliance', 'safety_warnings'
+      'item_sku', 'item_name', 'external_product_id', 'external_product_id_type',
+      'brand_name', 'manufacturer', 'part_number', 'product_description',
+      'item_type', 'feed_product_type', 'standard_price', 'quantity',
+      'condition_type', 'condition_note', 'bullet_point1', 'bullet_point2',
+      'bullet_point3', 'bullet_point4', 'bullet_point5', 'generic_keywords',
+      'main_image_url', 'other_image_url1', 'other_image_url2', 'other_image_url3',
+      'other_image_url4', 'other_image_url5', 'country_of_origin', 'ce_marking',
+      'safety_warning1', 'safety_warning2', 'safety_warning3', 'vehicle_make',
+      'vehicle_model', 'vehicle_year_from', 'vehicle_year_to', 'fitment_type',
+      'assembly_type', 'light_type', 'light_color', 'placement',
+      'number_of_pieces', 'warranty_description', 'fulfillment_center_id'
     ];
 
     const csvContent = [
       headers.join('\t'),
       ...amazonData.map(row => 
-        headers.map(header => {
-          const value = row[header as keyof typeof row]?.toString() || '';
-          return value.replace(/\t/g, ' ').replace(/\n/g, ' ');
-        }).join('\t')
+        headers.map(header => row[header as keyof typeof row] || '').join('\t')
       )
     ].join('\n');
 
-    // Add BOM for proper UTF-8 encoding
+    // Add BOM for proper UTF-8 encoding (required by Amazon)
     const BOM = '\uFEFF';
     const blob = new Blob([BOM + csvContent], { type: 'text/tab-separated-values;charset=utf-8' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `amazon-vehicle-light-${new Date().toISOString().split('T')[0]}.txt`;
+    a.download = `amazon-vehicle-light-assembly-${new Date().toISOString().split('T')[0]}.txt`;
     a.click();
 
-    toast.success(`Flat file Amazon generado: ${selectedIds.length} productos`);
+    toast.success(`Archivo Amazon generado con plantilla oficial: ${selectedIds.length} productos`);
   };
 
   const handleLogout = async () => {
