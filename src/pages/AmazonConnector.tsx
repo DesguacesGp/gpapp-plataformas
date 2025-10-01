@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Download, RefreshCw, Sparkles } from "lucide-react";
+import { ArrowLeft, Download, RefreshCw, Sparkles, ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AmazonProductsTable } from "@/components/AmazonProductsTable";
@@ -151,6 +151,9 @@ const AmazonConnector = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isAutoAssigning, setIsAutoAssigning] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const PRODUCTS_PER_PAGE = 100;
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -160,18 +163,32 @@ const AmazonConnector = () => {
         loadProducts();
       }
     });
-  }, [navigate]);
+  }, [navigate, currentPage]);
 
   const loadProducts = async () => {
     setIsLoading(true);
     try {
-      // Cargar productos con imágenes y procesados por IA
+      // Obtener total de productos primero
+      const { count, error: countError } = await supabase
+        .from('vauner_products')
+        .select('*', { count: 'exact', head: true })
+        .eq('has_image', true)
+        .not('translated_title', 'is', null);
+
+      if (countError) throw countError;
+      setTotalProducts(count || 0);
+
+      // Cargar productos con paginación
+      const from = (currentPage - 1) * PRODUCTS_PER_PAGE;
+      const to = from + PRODUCTS_PER_PAGE - 1;
+
       const { data: productsData, error: productsError } = await supabase
         .from('vauner_products')
         .select('*')
         .eq('has_image', true)
         .not('translated_title', 'is', null)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(from, to);
 
       if (productsError) throw productsError;
 
@@ -243,12 +260,28 @@ const AmazonConnector = () => {
   const autoAssignAmazonConfig = async () => {
     setIsAutoAssigning(true);
     try {
-      toast.info('🤖 Asignando automáticamente configuración de Amazon...');
+      toast.info('🤖 Asignando automáticamente configuración de Amazon a TODOS los productos...');
 
       let assignedCount = 0;
       let updatedCount = 0;
+      
+      // Obtener TODOS los productos, no solo los de la página actual
+      const { data: allProducts, error: productsError } = await supabase
+        .from('vauner_products')
+        .select('*')
+        .eq('has_image', true)
+        .not('translated_title', 'is', null);
 
-      for (const product of products) {
+      if (productsError) throw productsError;
+      if (!allProducts || allProducts.length === 0) {
+        toast.warning('No hay productos para procesar');
+        return;
+      }
+
+      const totalToProcess = allProducts.length;
+      toast.info(`Procesando ${totalToProcess} productos...`);
+
+      for (const product of allProducts) {
         const feedType = CATEGORY_TO_FEED_TYPE[product.category || ''];
         
         // Si no hay mapeo directo, marcar para revisión manual
@@ -330,7 +363,7 @@ const AmazonConnector = () => {
             }
           }
           
-          // Tipo de luz: Default LED, o según texto
+          // Tipo de luz: SOLO asignar si está explícitamente en el título
           if (fullText.includes('led')) {
             configData.light_type = 'LED';
           } else if (fullText.includes('halogen') || fullText.includes('halogeno') || fullText.includes('halógeno')) {
@@ -338,7 +371,7 @@ const AmazonConnector = () => {
           } else if (fullText.includes('xenon') || fullText.includes('xenón')) {
             configData.light_type = 'Xenón';
           } else {
-            configData.light_type = 'LED'; // Default
+            configData.light_type = ''; // Vacío si no está explícito
           }
           
         } else if (feedType === 'window_regulator') {
@@ -401,7 +434,14 @@ const AmazonConnector = () => {
         if (error) {
           console.error('Error assigning config:', error);
         } else {
-          if (product.amazon_config) {
+          // Verificar si ya existía config para este producto
+          const { data: existingConfig } = await supabase
+            .from('amazon_product_config')
+            .select('id')
+            .eq('product_id', product.id)
+            .single();
+            
+          if (existingConfig) {
             updatedCount++;
           } else {
             assignedCount++;
@@ -410,13 +450,13 @@ const AmazonConnector = () => {
       }
 
       const message = assignedCount > 0 && updatedCount > 0
-        ? `✅ ${assignedCount} productos configurados, ${updatedCount} actualizados`
+        ? `✅ ${assignedCount} productos configurados, ${updatedCount} actualizados (Total: ${totalToProcess})`
         : assignedCount > 0
-        ? `✅ ${assignedCount} productos configurados automáticamente`
-        : `✅ ${updatedCount} productos actualizados`;
+        ? `✅ ${assignedCount} productos configurados de ${totalToProcess}`
+        : `✅ ${updatedCount} productos actualizados de ${totalToProcess}`;
       
       toast.success(message);
-      loadProducts();
+      loadProducts(); // Recargar la página actual
     } catch (error: any) {
       console.error('Error auto-assigning:', error);
       toast.error('Error en asignación automática: ' + error.message);
@@ -756,10 +796,42 @@ const AmazonConnector = () => {
             {isLoading ? (
               <div className="text-center py-8 text-muted-foreground">Cargando productos...</div>
             ) : (
-              <AmazonProductsTable
-                products={products}
-                onSelectionChange={setSelectedIds}
-              />
+              <>
+                <AmazonProductsTable
+                  products={products}
+                  onSelectionChange={setSelectedIds}
+                />
+                
+                {/* Paginación */}
+                <div className="flex items-center justify-between mt-6 pt-6 border-t">
+                  <div className="text-sm text-muted-foreground">
+                    Mostrando {((currentPage - 1) * PRODUCTS_PER_PAGE) + 1} - {Math.min(currentPage * PRODUCTS_PER_PAGE, totalProducts)} de {totalProducts} productos
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4 mr-1" />
+                      Anterior
+                    </Button>
+                    <div className="text-sm font-medium px-3">
+                      Página {currentPage} de {Math.ceil(totalProducts / PRODUCTS_PER_PAGE)}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => p + 1)}
+                      disabled={currentPage >= Math.ceil(totalProducts / PRODUCTS_PER_PAGE)}
+                    >
+                      Siguiente
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
