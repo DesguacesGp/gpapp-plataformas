@@ -47,11 +47,74 @@ const CATEGORY_TO_FEED_TYPE: Record<string, string> = {
 };
 
 // Browse nodes de Amazon según plantilla oficial (Vehicle Light Assembly)
-const BROWSE_NODES: Record<string, string> = {
-  'mirror': '2425076031', // Coche y moto > Piezas para coche > Montaje de faros
-  'vehicle_light_assembly': '2425091031', // Coche y moto > Piezas para coche > Montaje de luces traseras
-  'window_regulator': '2425082031', // Coche y moto > Piezas para coche > Iluminación interior
-  'door_handle': '2425088031', // Coche y moto > Piezas para coche > Luces de matrícula
+// Nodos más comunes para diferentes tipos de luces
+const BROWSE_NODES_BY_TYPE: Record<string, string> = {
+  // Espejos retrovisores
+  'mirror': '2425076031', // Montaje de faros (genérico para espejos)
+  
+  // Luces traseras y pilotos
+  'luz_trasera': '2425091031', // Montaje de luces traseras
+  'piloto_trasero': '2425236031', // Luces traseras (motos)
+  'conjunto_piloto': '52470500031', // Conjuntos de luces traseras
+  
+  // Faros delanteros
+  'faro_delantero': '2425076031', // Montaje de faros
+  'faro': '2425228031', // Faros (motos)
+  
+  // Intermitentes
+  'intermitente': '2425083031', // Luces de giro
+  'turn_signal': '52470661031', // Conjuntos de intermitentes
+  
+  // Luces de freno
+  'luz_freno': '2425086031', // Tercera luz de freno
+  'brake_light': '2425234031', // Luces de freno (motos)
+  
+  // Elevalunas y otros
+  'window_regulator': '2425082031', // Iluminación interior
+  'door_handle': '2425088031', // Luces de matrícula
+  
+  // Genérico
+  'default': '2425091031', // Montaje de luces traseras (más común)
+};
+
+// Función para determinar el browse node específico basado en descripción
+const getBrowseNodeFromDescription = (description: string, category: string): string => {
+  const desc = description.toLowerCase();
+  
+  // Para espejos
+  if (category === 'ESPELHOS RETROVISORES') {
+    return BROWSE_NODES_BY_TYPE['mirror'];
+  }
+  
+  // Para iluminación, analizar la descripción
+  if (category === 'ILUMINACAO(FAROLINS)-VIATURAS EUROPEIAS') {
+    if (desc.includes('piloto') || desc.includes('trasero') || desc.includes('traseira')) {
+      return BROWSE_NODES_BY_TYPE['piloto_trasero'];
+    }
+    if (desc.includes('faro') || desc.includes('farol') || desc.includes('delantero')) {
+      return BROWSE_NODES_BY_TYPE['faro_delantero'];
+    }
+    if (desc.includes('intermitente') || desc.includes('pisca')) {
+      return BROWSE_NODES_BY_TYPE['intermitente'];
+    }
+    if (desc.includes('freno') || desc.includes('stop')) {
+      return BROWSE_NODES_BY_TYPE['luz_freno'];
+    }
+    // Por defecto para iluminación
+    return BROWSE_NODES_BY_TYPE['conjunto_piloto'];
+  }
+  
+  // Para elevalunas
+  if (category === 'ELEVADORES-PUNHOS-COMANDOS-FECHADURAS') {
+    if (desc.includes('eleva') || desc.includes('vidro')) {
+      return BROWSE_NODES_BY_TYPE['window_regulator'];
+    }
+    if (desc.includes('cerradura') || desc.includes('maneta') || desc.includes('puxador')) {
+      return BROWSE_NODES_BY_TYPE['door_handle'];
+    }
+  }
+  
+  return BROWSE_NODES_BY_TYPE['default'];
 };
 
 const AmazonConnector = () => {
@@ -154,14 +217,17 @@ const AmazonConnector = () => {
       toast.info('🤖 Asignando automáticamente configuración de Amazon...');
 
       let assignedCount = 0;
+      let updatedCount = 0;
 
       for (const product of products) {
-        if (product.amazon_config) continue; // Ya tiene configuración
-
         const feedType = CATEGORY_TO_FEED_TYPE[product.category || ''];
         if (!feedType) continue;
 
-        const browseNode = BROWSE_NODES[feedType];
+        // Determinar browse node específico basado en descripción
+        const browseNode = getBrowseNodeFromDescription(
+          product.description || '', 
+          product.category || ''
+        );
 
         const configData: any = {
           product_id: product.id,
@@ -169,36 +235,101 @@ const AmazonConnector = () => {
           recommended_browse_node: browseNode,
         };
 
-        // Asignar atributos específicos según el tipo
+        // Asignar atributos específicos según el tipo y descripción
+        const desc = (product.description || '').toLowerCase();
+        
         if (feedType === 'mirror') {
-          configData.mirror_position = 'left';
-          configData.mirror_heated = false;
-          configData.mirror_folding = false;
-          configData.mirror_turn_signal = false;
+          // Determinar posición del espejo
+          if (desc.includes('esquerdo') || desc.includes('izquierdo') || desc.includes('left')) {
+            configData.mirror_position = 'Izquierda';
+          } else if (desc.includes('direito') || desc.includes('derecho') || desc.includes('right')) {
+            configData.mirror_position = 'Derecha';
+          } else {
+            configData.mirror_position = 'Izquierda';
+          }
+          
+          configData.mirror_heated = desc.includes('calefacción') || desc.includes('heated');
+          configData.mirror_folding = desc.includes('plegable') || desc.includes('rebativel');
+          configData.mirror_turn_signal = desc.includes('intermitente') || desc.includes('pisca');
+          
         } else if (feedType === 'vehicle_light_assembly') {
-          configData.light_type = 'LED';
-          configData.light_placement = 'rear';
+          // Determinar tipo de luz
+          if (desc.includes('led')) {
+            configData.light_type = 'LED';
+          } else if (desc.includes('halogen') || desc.includes('halogeno')) {
+            configData.light_type = 'Halógeno';
+          } else {
+            configData.light_type = 'LED';
+          }
+          
+          // Determinar posición
+          if (desc.includes('trasero') || desc.includes('traseira') || desc.includes('piloto')) {
+            configData.light_placement = 'Parte trasera';
+          } else if (desc.includes('delantero') || desc.includes('dianteiro') || desc.includes('faro')) {
+            configData.light_placement = 'Delantero';
+          } else {
+            configData.light_placement = 'Parte trasera';
+          }
+          
+          // Determinar lado
+          if (desc.includes('esquerdo') || desc.includes('izquierdo') || desc.includes('left')) {
+            configData.light_placement = configData.light_placement + ' izquierda';
+          } else if (desc.includes('direito') || desc.includes('derecho') || desc.includes('right')) {
+            configData.light_placement = configData.light_placement + ' derecha';
+          }
+          
         } else if (feedType === 'window_regulator') {
-          configData.window_side = 'left';
+          if (desc.includes('esquerdo') || desc.includes('izquierdo') || desc.includes('left')) {
+            configData.window_side = 'Izquierda';
+          } else if (desc.includes('direito') || desc.includes('derecho') || desc.includes('right')) {
+            configData.window_side = 'Derecha';
+          } else {
+            configData.window_side = 'Izquierda';
+          }
+          
           configData.window_doors = '4';
-          configData.window_mechanism = 'electric';
+          configData.window_mechanism = desc.includes('electr') ? 'Eléctrico' : 'Manual';
+          
         } else if (feedType === 'door_handle') {
-          configData.door_placement = 'front_left';
-          configData.door_material = 'plastic';
+          if (desc.includes('delantero') || desc.includes('dianteiro')) {
+            configData.door_placement = 'Delantero';
+          } else if (desc.includes('trasero') || desc.includes('traseira')) {
+            configData.door_placement = 'Trasero';
+          } else {
+            configData.door_placement = 'Delantero';
+          }
+          
+          if (desc.includes('esquerdo') || desc.includes('izquierdo') || desc.includes('left')) {
+            configData.door_placement = configData.door_placement + ' izquierdo';
+          } else if (desc.includes('direito') || desc.includes('derecho') || desc.includes('right')) {
+            configData.door_placement = configData.door_placement + ' derecho';
+          }
+          
+          configData.door_material = desc.includes('metal') ? 'Metal' : 'Plástico';
         }
 
         const { error } = await supabase
           .from('amazon_product_config')
-          .upsert(configData);
+          .upsert(configData, { onConflict: 'product_id' });
 
         if (error) {
           console.error('Error assigning config:', error);
         } else {
-          assignedCount++;
+          if (product.amazon_config) {
+            updatedCount++;
+          } else {
+            assignedCount++;
+          }
         }
       }
 
-      toast.success(`✅ ${assignedCount} productos configurados automáticamente`);
+      const message = assignedCount > 0 && updatedCount > 0
+        ? `✅ ${assignedCount} productos configurados, ${updatedCount} actualizados`
+        : assignedCount > 0
+        ? `✅ ${assignedCount} productos configurados automáticamente`
+        : `✅ ${updatedCount} productos actualizados`;
+      
+      toast.success(message);
       loadProducts();
     } catch (error: any) {
       console.error('Error auto-assigning:', error);
