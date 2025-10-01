@@ -27,6 +27,7 @@ interface AmazonProduct {
     window_mechanism?: string;
     door_placement?: string;
     door_material?: string;
+    requires_manual_review?: boolean;
   };
 }
 
@@ -125,13 +126,14 @@ export const AmazonProductsTable = ({ products, onSelectionChange }: AmazonProdu
             <TableHead>Atributos Específicos</TableHead>
             <TableHead>Stock</TableHead>
             <TableHead>Precio</TableHead>
+            <TableHead className="text-center">Estado</TableHead>
             <TableHead className="text-center">Config</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {products.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
                 No hay productos disponibles. Asegúrate de tener productos con imágenes y procesados por IA.
               </TableCell>
             </TableRow>
@@ -170,6 +172,17 @@ export const AmazonProductsTable = ({ products, onSelectionChange }: AmazonProdu
                 </TableCell>
                 <TableCell>{product.stock}</TableCell>
                 <TableCell>€{(product.final_price || product.price).toFixed(2)}</TableCell>
+                <TableCell className="text-center">
+                  {product.amazon_config?.requires_manual_review ? (
+                    <Badge variant="destructive" className="text-xs">
+                      Revisar Manual
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary" className="text-xs bg-accent/10 text-accent">
+                      Automático
+                    </Badge>
+                  )}
+                </TableCell>
                 <TableCell className="text-center">
                   {product.amazon_config ? (
                     <Check className="h-5 w-5 text-accent mx-auto" />

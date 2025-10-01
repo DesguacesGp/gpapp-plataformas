@@ -226,6 +226,7 @@ const AmazonConnector = () => {
             window_mechanism: config.window_mechanism,
             door_placement: config.door_placement,
             door_material: config.door_material,
+            requires_manual_review: config.requires_manual_review,
           } : undefined
         };
       });
@@ -249,7 +250,13 @@ const AmazonConnector = () => {
 
       for (const product of products) {
         const feedType = CATEGORY_TO_FEED_TYPE[product.category || ''];
-        if (!feedType) continue;
+        
+        // Si no hay mapeo directo, marcar para revisión manual
+        let requiresManualReview = false;
+        if (!feedType) {
+          requiresManualReview = true;
+          continue; // Skip products without mapping
+        }
 
         // Determinar browse node específico basado en descripción
         const browseNode = getBrowseNodeFromDescription(
@@ -261,6 +268,7 @@ const AmazonConnector = () => {
           product_id: product.id,
           feed_product_type: feedType,
           recommended_browse_node: browseNode,
+          requires_manual_review: requiresManualReview,
         };
 
         // Asignar atributos específicos según el tipo y descripción
@@ -275,23 +283,41 @@ const AmazonConnector = () => {
           } else if (fullText.includes('direito') || fullText.includes('derecho') || fullText.includes('right')) {
             configData.mirror_position = 'Derecha';
           } else {
-            configData.mirror_position = '';
+            configData.mirror_position = 'Izquierda'; // Default
           }
           
+          // Heated: default No
           configData.mirror_heated = fullText.includes('calefacción') || fullText.includes('heated') || fullText.includes('aquecido');
-          configData.mirror_folding = fullText.includes('plegable') || fullText.includes('rebativel') || fullText.includes('abatible');
+          
+          // Folding: SOLO si contiene "REB" (rebatível)
+          configData.mirror_folding = fullText.includes('reb');
+          
+          // Turn signal: default No
           configData.mirror_turn_signal = fullText.includes('intermitente') || fullText.includes('pisca') || fullText.includes('indicator');
           
         } else if (feedType === 'vehicle_light_assembly') {
-          // Para FAROLINS (pilotos), SIEMPRE es trasera
+          // Para FAROLINS, detectar si es delantero o trasero según título
           if (product.category === 'ILUMINACAO(FAROLINS)-VIATURAS EUROPEIAS') {
-            configData.light_placement = 'Parte trasera';
-            
-            // Determinar lado solo si está explícito
-            if (fullText.includes('esquerdo') || fullText.includes('izquierdo') || fullText.includes('left')) {
-              configData.light_placement = 'Parte trasera izquierda';
-            } else if (fullText.includes('direito') || fullText.includes('derecho') || fullText.includes('right')) {
-              configData.light_placement = 'Parte trasera derecha';
+            // Buscar "delantero" en el título primero
+            if (fullText.includes('delantero') || fullText.includes('dianteiro') || fullText.includes('frontal')) {
+              configData.light_placement = 'Delantero';
+              
+              // Determinar lado si está explícito
+              if (fullText.includes('esquerdo') || fullText.includes('izquierdo') || fullText.includes('left')) {
+                configData.light_placement = 'Delantero izquierdo';
+              } else if (fullText.includes('direito') || fullText.includes('derecho') || fullText.includes('right')) {
+                configData.light_placement = 'Delantero derecho';
+              }
+            } else {
+              // Por defecto trasero para farolins
+              configData.light_placement = 'Parte trasera';
+              
+              // Determinar lado solo si está explícito
+              if (fullText.includes('esquerdo') || fullText.includes('izquierdo') || fullText.includes('left')) {
+                configData.light_placement = 'Parte trasera izquierda';
+              } else if (fullText.includes('direito') || fullText.includes('derecho') || fullText.includes('right')) {
+                configData.light_placement = 'Parte trasera derecha';
+              }
             }
           } else {
             // Para otros tipos de iluminación, determinar según descripción
@@ -300,11 +326,11 @@ const AmazonConnector = () => {
             } else if (fullText.includes('trasero') || fullText.includes('traseira') || fullText.includes('rear')) {
               configData.light_placement = 'Parte trasera';
             } else {
-              configData.light_placement = '';
+              configData.light_placement = 'Parte trasera'; // Default
             }
           }
           
-          // Tipo de luz: SOLO asignar si está EXPLÍCITAMENTE en el texto
+          // Tipo de luz: Default LED, o según texto
           if (fullText.includes('led')) {
             configData.light_type = 'LED';
           } else if (fullText.includes('halogen') || fullText.includes('halogeno') || fullText.includes('halógeno')) {
@@ -312,37 +338,59 @@ const AmazonConnector = () => {
           } else if (fullText.includes('xenon') || fullText.includes('xenón')) {
             configData.light_type = 'Xenón';
           } else {
-            // No asumir nada, dejar vacío
-            configData.light_type = '';
+            configData.light_type = 'LED'; // Default
           }
           
         } else if (feedType === 'window_regulator') {
+          // Determinar lado
           if (fullText.includes('esquerdo') || fullText.includes('izquierdo') || fullText.includes('left')) {
             configData.window_side = 'Izquierda';
           } else if (fullText.includes('direito') || fullText.includes('derecho') || fullText.includes('right')) {
             configData.window_side = 'Derecha';
           } else {
-            configData.window_side = '';
+            configData.window_side = 'Izquierda'; // Default
           }
           
-          configData.window_doors = '4';
-          configData.window_mechanism = (fullText.includes('electr') || fullText.includes('eléctrico')) ? 'Eléctrico' : 'Manual';
+          // Número de puertas: SOLO si está explícito, sino vacío
+          if (fullText.includes('4 portas') || fullText.includes('4 puertas') || fullText.includes('4-door')) {
+            configData.window_doors = '4';
+          } else if (fullText.includes('2 portas') || fullText.includes('2 puertas') || fullText.includes('2-door')) {
+            configData.window_doors = '2';
+          } else if (fullText.includes('5 portas') || fullText.includes('5 puertas') || fullText.includes('5-door')) {
+            configData.window_doors = '5';
+          } else {
+            configData.window_doors = ''; // Vacío si no está explícito
+          }
+          
+          // Mecanismo: Manual o Eléctrico según título
+          if (fullText.includes('electr') || fullText.includes('eléctrico') || fullText.includes('elétrico')) {
+            configData.window_mechanism = 'Eléctrico';
+          } else if (fullText.includes('manual')) {
+            configData.window_mechanism = 'Manual';
+          } else {
+            configData.window_mechanism = 'Eléctrico'; // Default
+          }
           
         } else if (feedType === 'door_handle') {
+          // Determinar posición
           if (fullText.includes('delantero') || fullText.includes('dianteiro') || fullText.includes('front')) {
             configData.door_placement = 'Delantero';
           } else if (fullText.includes('trasero') || fullText.includes('traseira') || fullText.includes('rear')) {
             configData.door_placement = 'Trasero';
           } else {
-            configData.door_placement = '';
+            configData.door_placement = 'Delantero'; // Default
           }
           
+          // Determinar lado
           if (fullText.includes('esquerdo') || fullText.includes('izquierdo') || fullText.includes('left')) {
-            configData.door_placement = configData.door_placement ? configData.door_placement + ' izquierdo' : 'Izquierdo';
+            configData.door_placement = configData.door_placement + ' izquierdo';
           } else if (fullText.includes('direito') || fullText.includes('derecho') || fullText.includes('right')) {
-            configData.door_placement = configData.door_placement ? configData.door_placement + ' derecho' : 'Derecho';
+            configData.door_placement = configData.door_placement + ' derecho';
+          } else {
+            configData.door_placement = configData.door_placement + ' izquierdo'; // Default
           }
           
+          // Material: Default Plástico
           configData.door_material = fullText.includes('metal') || fullText.includes('aluminio') ? 'Metal' : 'Plástico';
         }
 
@@ -584,21 +632,31 @@ const AmazonConnector = () => {
       ];
     });
 
-    // Generar contenido con estructura de 5 filas de encabezado (simplificado a la fila principal)
+    // Generar las 5 filas de encabezado según plantilla Amazon
+    const headerRow1 = headers.join('\t');
+    const headerRow2 = headers.map(() => '').join('\t'); // Fila vacía
+    const headerRow3 = headers.map(() => '').join('\t'); // Fila vacía
+    const headerRow4 = headers.map(() => '').join('\t'); // Fila vacía
+    const headerRow5 = headers.map(() => '').join('\t'); // Fila vacía
+    
     const csvContent = [
-      headers.join('\t'),
+      headerRow1,
+      headerRow2,
+      headerRow3,
+      headerRow4,
+      headerRow5,
       ...amazonData.map(row => row.join('\t'))
     ].join('\n');
 
-    const BOM = '\uFEFF';
-    const blob = new Blob([BOM + csvContent], { type: 'text/tab-separated-values;charset=utf-8' });
+    // UTF-8 SIN BOM (eliminar el BOM)
+    const blob = new Blob([csvContent], { type: 'text/tab-separated-values;charset=utf-8' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `amazon-vehicle-light-assembly-${new Date().toISOString().split('T')[0]}.txt`;
     a.click();
 
-    toast.success(`✅ Archivo Amazon generado con plantilla oficial: ${selectedIds.length} productos`);
+    toast.success(`✅ Archivo Amazon generado (UTF-8 sin BOM): ${selectedIds.length} productos`);
   };
 
   return (

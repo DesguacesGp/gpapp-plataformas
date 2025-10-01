@@ -29,6 +29,7 @@ export type Database = {
           mirror_turn_signal: boolean | null
           product_id: string
           recommended_browse_node: string | null
+          requires_manual_review: boolean | null
           updated_at: string
           window_doors: string | null
           window_mechanism: string | null
@@ -48,6 +49,7 @@ export type Database = {
           mirror_turn_signal?: boolean | null
           product_id: string
           recommended_browse_node?: string | null
+          requires_manual_review?: boolean | null
           updated_at?: string
           window_doors?: string | null
           window_mechanism?: string | null
@@ -67,6 +69,7 @@ export type Database = {
           mirror_turn_signal?: boolean | null
           product_id?: string
           recommended_browse_node?: string | null
+          requires_manual_review?: boolean | null
           updated_at?: string
           window_doors?: string | null
           window_mechanism?: string | null
