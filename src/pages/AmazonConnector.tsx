@@ -6,6 +6,7 @@ import { ArrowLeft, Download, RefreshCw, Sparkles, ChevronLeft, ChevronRight } f
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AmazonProductsTable } from "@/components/AmazonProductsTable";
+import * as XLSX from 'xlsx';
 
 interface AmazonProduct {
   id: string;
@@ -672,31 +673,41 @@ const AmazonConnector = () => {
       ];
     });
 
-    // Generar las 5 filas de encabezado según plantilla Amazon
-    const headerRow1 = headers.join('\t');
-    const headerRow2 = headers.map(() => '').join('\t'); // Fila vacía
-    const headerRow3 = headers.map(() => '').join('\t'); // Fila vacía
-    const headerRow4 = headers.map(() => '').join('\t'); // Fila vacía
-    const headerRow5 = headers.map(() => '').join('\t'); // Fila vacía
+    // Crear el workbook y worksheet con estructura Excel
+    const wb = XLSX.utils.book_new();
     
-    const csvContent = [
-      headerRow1,
-      headerRow2,
-      headerRow3,
-      headerRow4,
-      headerRow5,
-      ...amazonData.map(row => row.join('\t'))
-    ].join('\n');
+    // Crear las 5 filas de encabezado según plantilla Amazon
+    const emptyRow = new Array(headers.length).fill('');
+    const wsData = [
+      headers,
+      emptyRow,
+      emptyRow,
+      emptyRow,
+      emptyRow,
+      ...amazonData
+    ];
+    
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    
+    // Aplicar estilos a la primera fila (encabezados)
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+      const address = XLSX.utils.encode_col(C) + "1";
+      if (!ws[address]) continue;
+      ws[address].s = {
+        font: { bold: true },
+        fill: { fgColor: { rgb: "FFFF00" } },
+        alignment: { horizontal: "center", vertical: "center" }
+      };
+    }
+    
+    // Agregar la hoja al workbook
+    XLSX.utils.book_append_sheet(wb, ws, "Plantilla");
+    
+    // Generar el archivo Excel
+    XLSX.writeFile(wb, `amazon-plantilla-${new Date().toISOString().split('T')[0]}.xlsx`);
 
-    // UTF-8 SIN BOM (eliminar el BOM)
-    const blob = new Blob([csvContent], { type: 'text/tab-separated-values;charset=utf-8' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `amazon-vehicle-light-assembly-${new Date().toISOString().split('T')[0]}.txt`;
-    a.click();
-
-    toast.success(`✅ Archivo Amazon generado (UTF-8 sin BOM): ${selectedIds.length} productos`);
+    toast.success(`✅ Archivo Excel Amazon generado: ${selectedIds.length} productos`);
   };
 
   return (
