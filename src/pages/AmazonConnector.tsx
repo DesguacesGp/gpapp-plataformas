@@ -46,12 +46,12 @@ const CATEGORY_TO_FEED_TYPE: Record<string, string> = {
   'ELEVADORES-PUNHOS-COMANDOS-FECHADURAS': 'window_regulator',
 };
 
-// Browse nodes de Amazon para Coche y Moto (ejemplos comunes)
+// Browse nodes de Amazon según plantilla oficial (Vehicle Light Assembly)
 const BROWSE_NODES: Record<string, string> = {
-  'mirror': '14284301031', // Automotive > Replacement Parts > Body > Mirrors
-  'vehicle_light_assembly': '14284441031', // Automotive > Replacement Parts > Lighting
-  'window_regulator': '14284361031', // Automotive > Replacement Parts > Body > Window Regulators
-  'door_handle': '14284331031', // Automotive > Replacement Parts > Body > Door Handles
+  'mirror': '2425076031', // Coche y moto > Piezas para coche > Montaje de faros
+  'vehicle_light_assembly': '2425091031', // Coche y moto > Piezas para coche > Montaje de luces traseras
+  'window_regulator': '2425082031', // Coche y moto > Piezas para coche > Iluminación interior
+  'door_handle': '2425088031', // Coche y moto > Piezas para coche > Luces de matrícula
 };
 
 const AmazonConnector = () => {
@@ -221,87 +221,204 @@ const AmazonConnector = () => {
       return text.replace(/\t/g, ' ').replace(/\n/g, ' ').replace(/\r/g, ' ').trim();
     };
 
-    // Generar datos según el feed_product_type
+    // Estructura EXACTA de la plantilla oficial de Amazon (Vehicle Light Assembly)
+    const headers = [
+      'Número de atributos con errores',
+      'Número de atributos con otras sugerencias',
+      'SKU',
+      'Acción de listing',
+      'Tipo de producto',
+      'Nombre del producto',
+      'Marca',
+      'Tipo de identificador del producto',
+      'ID del producto',
+      'Nodos recomendados de búsqueda',
+      'Nodos recomendados de búsqueda',
+      'Nodos recomendados de búsqueda',
+      'Nodos recomendados de búsqueda',
+      'Nodos recomendados de búsqueda',
+      'Nivel de paquete',
+      'El paquete contiene la cantidad de SKU',
+      'El paquete contiene un identificador de SKU',
+      'Numero de modelo',
+      'Nombre Modelo',
+      'Fabricante',
+      'Código UNSPSC',
+      'Número de inventario nacional',
+      'Año Modelo',
+      'Saltar oferta',
+      'Estado del producto',
+      'Precio de venta recomendado (PVPR)',
+      'Grupo de la marina mercante',
+      'Cumplimiento de código de canal (ES)',
+      'Cantidad (ES)',
+      'Inventario siempre disponible (ES)',
+      'Tu precio EUR (Vender en Amazon, ES)',
+      'Tu precio EUR (B2B, ES)',
+      'Descripción del producto',
+      'Viñeta',
+      'Características especiales',
+      'Características especiales',
+      'Características especiales',
+      'Características especiales',
+      'Características especiales',
+      'Estilo',
+      'Material',
+      'Número de Artículos',
+      'Cantidad del paquete del artículo',
+      'Color',
+      'Tamaño del anillo',
+      'Tamaño',
+      'Numero de pieza',
+      'Forma del artículo',
+      'Tipo de corte',
+      'Número de pieza equivalente del fabricante de equipos originales',
+      'Número de pieza equivalente del fabricante de equipos originales',
+      'Número de pieza equivalente del fabricante de equipos originales',
+      'Número de pieza equivalente del fabricante de equipos originales',
+      'Número de pieza equivalente del fabricante de equipos originales',
+      'Edición',
+      'Configuración',
+      'Posición de la pieza del vehículo',
+      'Posición de la pieza del vehículo',
+      'Requiere montaje',
+      'Color de la lente',
+      'Material Lente',
+      'Potencia',
+      'Potencia Unidad',
+      'Tensión',
+      'Tensión Unidad',
+      'Grado del Producto',
+      'Orientación',
+      'Tipo de embalaje',
+      'Patrón',
+      'Compatibilidad con tipo de vehículo',
+      'Compatibilidad con tipo de vehículo',
+      'Compatibilidad con tipo de vehículo',
+      'Compatibilidad con tipo de vehículo',
+      'Compatibilidad con tipo de vehículo',
+      'Componentes Incluidos',
+      'Usos Específicos Para Producto',
+      'Usos Específicos Para Producto',
+      'Usos Específicos Para Producto',
+      'Usos Específicos Para Producto',
+      'Usos Específicos Para Producto',
+      'Nombre del equipo',
+      '¿Es frágil?',
+      'Fuente Luz',
+      'Tipo de ajuste para el vehículo',
+      'Nombre del conjunto',
+      'Nivel de relación',
+      'SKU principal',
+      'Nombre del tema de variación',
+      'País de origen',
+      'Garantía de Producto',
+      '¿Se necesitan baterías?',
+      '¿Están incluidas las baterías?',
+      'Composición de la batería',
+      'Peso Batería',
+      'Unidad de peso de la batería',
+      'Número de Baterías/pilas',
+      'Tipo de pilas/baterías',
+      'Número de pilas de litio y metal',
+      'Número de células de iones de litio',
+      'contenido de energía de la batería de litio',
+      'Unidad de contenido de energía de la batería de litio',
+      'Embalaje de la batería de litio',
+      'Peso de la batería de litio',
+      'Unidad del peso de la batería de litio',
+      'Normativas sobre mercancías peligrosas',
+      'Clase GHS',
+      'Detalle del material peligroso',
+      'Materiales peligrosos',
+      'URL Hoja Datos Seguridad (SDS o MSDS)',
+      'Peso Artículo',
+      'Unidad de peso del artículo',
+      'Duración de la disponibilidad de piezas de recambio en la UE',
+      'Unidad de la duración de la disponibilidad de piezas de recambio en la UE',
+      'URL de la imagen principal',
+      'Longitud del artículo',
+      'longitud del artículo',
+      'ancho del articulo',
+      'Unidad de ancho de artículo',
+      'Altura del artículo',
+      'Unidad de altura del artículo',
+      'Longitud Paquete',
+      'Unidad de longitud del paquete',
+      'Ancho Paquete',
+      'Unidad de anchura del paquete',
+      'Altura Paquete',
+      'Unidad de altura del paquete',
+      'Peso del paquete',
+      'Unidad del peso del paquete',
+      'Número de cajas'
+    ];
+
+    // Generar datos según estructura oficial
     const amazonData = selectedProducts.map(product => {
       const config = product.amazon_config;
-      const baseData: any = {
-        item_sku: cleanText(product.sku),
-        item_name: cleanText(product.translated_title || product.description),
-        external_product_id: '',
-        external_product_id_type: '',
-        brand_name: 'Recambify',
-        manufacturer: 'INNOVA RECAMBIOS SL',
-        part_number: cleanText(product.sku),
-        product_description: cleanText('Importador: INNOVA RECAMBIOS SL, CIF B06720221, AVDA FEDERICO MAYOR ZARAGOZA NAVE 8, 06006 Badajoz, Tel: 924114454'),
-        item_type: config?.feed_product_type || 'auto_accessory',
-        feed_product_type: 'Automotive',
-        recommended_browse_node: config?.recommended_browse_node || '',
-        standard_price: (product.final_price || product.price).toFixed(2),
-        quantity: product.stock.toString(),
-        condition_type: 'New',
-        condition_note: '',
-        bullet_point1: cleanText(product.bullet_points?.[0] || ''),
-        bullet_point2: cleanText(product.bullet_points?.[1] || ''),
-        bullet_point3: cleanText(product.bullet_points?.[2] || ''),
-        bullet_point4: cleanText(product.bullet_points?.[3] || ''),
-        bullet_point5: cleanText(product.bullet_points?.[4] || ''),
-        generic_keywords: cleanText([product.category, 'recambio', 'compatible', 'OEM', 'aftermarket'].filter(Boolean).join(', ')),
-        main_image_url: '',
-        other_image_url1: '',
-        other_image_url2: '',
-        other_image_url3: '',
-        other_image_url4: '',
-        other_image_url5: '',
-        country_of_origin: 'CN',
-        ce_marking: 'No',
-        safety_warning1: 'Ninguno',
-        safety_warning2: '',
-        safety_warning3: '',
-        vehicle_make: cleanText(product.marca || ''),
-        vehicle_model: cleanText(product.modelo || ''),
-        vehicle_year_from: cleanText(product.año_desde || ''),
-        vehicle_year_to: cleanText(product.año_hasta || ''),
-        fitment_type: 'Direct Replacement',
-        warranty_description: '2 años garantía',
-        fulfillment_center_id: ''
-      };
-
-      // Agregar campos específicos según el tipo
-      if (config?.feed_product_type === 'mirror') {
-        baseData.mirror_position = config.mirror_position || '';
-        baseData.mirror_heated = config.mirror_heated ? 'Yes' : 'No';
-        baseData.mirror_folding = config.mirror_folding ? 'Yes' : 'No';
-        baseData.mirror_turn_signal = config.mirror_turn_signal ? 'Yes' : 'No';
-      } else if (config?.feed_product_type === 'vehicle_light_assembly') {
-        baseData.assembly_type = 'Vehicle Light Assembly';
-        baseData.light_type = config.light_type || '';
-        baseData.placement = config.light_placement || '';
-        baseData.number_of_pieces = '1';
-      } else if (config?.feed_product_type === 'window_regulator') {
-        baseData.window_side = config.window_side || '';
-        baseData.window_doors = config.window_doors || '';
-        baseData.window_mechanism = config.window_mechanism || '';
-      } else if (config?.feed_product_type === 'door_handle') {
-        baseData.door_placement = config.door_placement || '';
-        baseData.door_material = config.door_material || '';
-      }
-
-      return baseData;
+      
+      return [
+        '', // Número de atributos con errores
+        '', // Número de atributos con otras sugerencias
+        cleanText(product.sku), // SKU
+        '(Predeterminado) Crear o reemplazar', // Acción de listing
+        'ACCESORIO', // Tipo de producto
+        cleanText(product.translated_title || product.description), // Nombre del producto
+        'Recambify', // Marca
+        'EAN', // Tipo de identificador del producto
+        '', // ID del producto
+        config?.recommended_browse_node || '', // Nodos recomendados de búsqueda
+        '', '', '', '', // Nodos adicionales
+        '', '', '', // Nivel de paquete, cantidad, identificador
+        cleanText(product.sku), // Numero de modelo
+        '', // Nombre Modelo
+        'INNOVA RECAMBIOS SL', // Fabricante
+        '', '', '', '', // Código UNSPSC, inventario, año modelo, saltar oferta
+        'Nuevo', // Estado del producto
+        '', '', '', // PVPR, grupo marina, cumplimiento
+        product.stock.toString(), // Cantidad (ES)
+        '', // Inventario siempre disponible
+        (product.final_price || product.price).toFixed(2), // Tu precio EUR (Vender en Amazon)
+        '', // Tu precio EUR (B2B)
+        cleanText('Importador: INNOVA RECAMBIOS SL, CIF B06720221, AVDA FEDERICO MAYOR ZARAGOZA NAVE 8, 06006 Badajoz, Tel: 924114454'), // Descripción
+        cleanText(product.bullet_points?.[0] || ''), // Viñeta
+        cleanText(product.bullet_points?.[1] || ''), // Características especiales
+        cleanText(product.bullet_points?.[2] || ''),
+        cleanText(product.bullet_points?.[3] || ''),
+        cleanText(product.bullet_points?.[4] || ''),
+        '', '', '', '', '', '', '', '', '', '', // Estilo, Material, Número Artículos, etc.
+        cleanText(product.sku), // Numero de pieza
+        '', // Forma del artículo
+        'Específicos del vehículo', // Tipo de corte
+        '', '', '', '', '', '', '', // OEM refs, Edición, Configuración
+        config?.light_placement || '', // Posición de la pieza del vehículo
+        '', '', // Posición adicional, Requiere montaje
+        config?.light_type || '', // Color de la lente (o tipo de luz)
+        'Policarbonato', // Material Lente
+        '', '', '', '', '', '', '', '', // Potencia, Tensión, Grado, etc.
+        cleanText(product.marca || ''), // Compatibilidad con tipo de vehículo
+        cleanText(product.modelo || ''),
+        cleanText(product.año_desde || ''),
+        cleanText(product.año_hasta || ''),
+        '', '', '', '', '', '', '', '', '', '', '', '', '', '', // Componentes, Usos, etc.
+        'Ajuste universal', // Tipo de ajuste para el vehículo
+        '', '', '', '', // Nombre conjunto, nivel relación, SKU principal, tema variación
+        'España', // País de origen
+        '2 años garantía', // Garantía de Producto
+        'No', // ¿Se necesitan baterías?
+        'No', // ¿Están incluidas las baterías?
+        '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', // Batería, materiales peligrosos
+        '', '', '', '', '', // Peso, duración
+        '', // URL de la imagen principal
+        '', '', '', '', '', '', '', '', '', '', '', '', '', '', '' // Dimensiones
+      ];
     });
 
-    // Determinar todas las columnas únicas presentes en los datos
-    const allColumns = new Set<string>();
-    amazonData.forEach(row => {
-      Object.keys(row).forEach(key => allColumns.add(key));
-    });
-
-    const headers = Array.from(allColumns);
-
+    // Generar contenido con estructura de 5 filas de encabezado (simplificado a la fila principal)
     const csvContent = [
       headers.join('\t'),
-      ...amazonData.map(row => 
-        headers.map(header => row[header] || '').join('\t')
-      )
+      ...amazonData.map(row => row.join('\t'))
     ].join('\n');
 
     const BOM = '\uFEFF';
@@ -309,10 +426,10 @@ const AmazonConnector = () => {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `amazon-flat-file-${new Date().toISOString().split('T')[0]}.txt`;
+    a.download = `amazon-vehicle-light-assembly-${new Date().toISOString().split('T')[0]}.txt`;
     a.click();
 
-    toast.success(`✅ Archivo Amazon generado: ${selectedIds.length} productos`);
+    toast.success(`✅ Archivo Amazon generado con plantilla oficial: ${selectedIds.length} productos`);
   };
 
   return (
