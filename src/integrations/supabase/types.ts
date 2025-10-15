@@ -338,6 +338,7 @@ export type Database = {
           marca: string | null
           modelo: string | null
           price: number
+          processed_image_url: string | null
           raw_data: Json | null
           sku: string
           stock: number
@@ -357,6 +358,7 @@ export type Database = {
           marca?: string | null
           modelo?: string | null
           price: number
+          processed_image_url?: string | null
           raw_data?: Json | null
           sku: string
           stock?: number
@@ -376,6 +378,7 @@ export type Database = {
           marca?: string | null
           modelo?: string | null
           price?: number
+          processed_image_url?: string | null
           raw_data?: Json | null
           sku?: string
           stock?: number

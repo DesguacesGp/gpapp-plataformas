@@ -26,6 +26,7 @@ interface AmazonProduct {
   año_desde: string | null;
   año_hasta: string | null;
   raw_data?: any;
+  processed_image_url?: string | null;
   amazon_config?: {
     feed_product_type: string;
     recommended_browse_node: string;
@@ -672,7 +673,7 @@ const AmazonConnector = () => {
         'No', // ¿Están incluidas las baterías?
         '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', // Batería, materiales peligrosos
         '', '', '', '', '', // Peso, duración
-        product.raw_data?.image ? `https://www.vauner.pt/${product.raw_data.image}` : '', // URL de la imagen principal
+        product.processed_image_url || (product.raw_data?.image ? `https://www.vauner.pt/${product.raw_data.image}` : ''), // URL de la imagen principal
         '', '', '', '', '', '', '', '', '', '', '', '', '', '', '' // Dimensiones
       ];
     });

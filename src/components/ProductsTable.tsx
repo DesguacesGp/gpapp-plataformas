@@ -34,6 +34,7 @@ interface Product {
   año_desde: string | null;
   año_hasta: string | null;
   raw_data?: any;
+  processed_image_url?: string | null;
 }
 
 interface ProductsTableProps {
@@ -433,19 +434,26 @@ export const ProductsTable = ({
                     €{(product.final_price || product.price).toFixed(2)}
                   </TableCell>
                   <TableCell className="text-center">
-                    {product.has_image && product.raw_data?.image ? (
-                      <a 
-                        href={`https://www.vauner.pt/${product.raw_data.image}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-blue-600 hover:underline truncate block max-w-[150px]"
-                      >
-                        {product.raw_data.image}
-                      </a>
+                    {product.has_image ? (
+                      product.processed_image_url ? (
+                        <a 
+                          href={product.processed_image_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-600 hover:underline truncate block max-w-[150px]"
+                          title={product.processed_image_url}
+                        >
+                          Ver imagen
+                        </a>
+                      ) : product.raw_data?.image ? (
+                        <Badge variant="secondary" className="text-xs">
+                          ⏳ Procesando
+                        </Badge>
+                      ) : (
+                        <Badge variant="default">Sí</Badge>
+                      )
                     ) : (
-                      <Badge variant={product.has_image ? "default" : "secondary"}>
-                        {product.has_image ? "Sí" : "No"}
-                      </Badge>
+                      <Badge variant="secondary">No</Badge>
                     )}
                   </TableCell>
                   <TableCell>

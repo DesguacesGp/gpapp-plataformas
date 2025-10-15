@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.resume-processing]
 verify_jwt = false
+
+[functions.process-product-image]
+verify_jwt = false

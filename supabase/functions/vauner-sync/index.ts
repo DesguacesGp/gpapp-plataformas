@@ -315,6 +315,74 @@ Deno.serve(async (req) => {
           )
         }
 
+        // Step 3.5: Process images for products that don't have processed_image_url
+        console.log('🖼️ Starting image processing for products...')
+        const { data: productsNeedingImages, error: imagesError } = await supabaseClient
+          .from('vauner_products')
+          .select('id, sku, raw_data')
+          .is('processed_image_url', null)
+          .not('raw_data', 'is', null)
+          .limit(100) // Process up to 100 images per sync
+        
+        if (!imagesError && productsNeedingImages && productsNeedingImages.length > 0) {
+          console.log(`📸 Found ${productsNeedingImages.length} products needing image processing`)
+          
+          // Process images in background (don't wait for completion)
+          const imageProcessingPromises = productsNeedingImages.map(async (product) => {
+            try {
+              if (!product.raw_data?.image) {
+                console.log(`⚠️ Product ${product.sku} has no image in raw_data`)
+                return
+              }
+              
+              console.log(`🔄 Processing image for ${product.sku}`)
+              
+              // Call process-product-image function
+              const response = await fetch(
+                `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-product-image`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    vaunerImageUrl: product.raw_data.image,
+                    sku: product.sku,
+                    vaunerBaseUrl: vaunerUrl
+                  })
+                }
+              )
+              
+              if (response.ok) {
+                const result = await response.json()
+                if (result.success && result.url) {
+                  // Update product with processed image URL
+                  await supabaseClient
+                    .from('vauner_products')
+                    .update({ processed_image_url: result.url })
+                    .eq('id', product.id)
+                  
+                  console.log(`✅ Image processed for ${product.sku}: ${result.url}`)
+                }
+              } else {
+                console.error(`❌ Failed to process image for ${product.sku}: ${response.status}`)
+              }
+            } catch (err) {
+              console.error(`❌ Error processing image for ${product.sku}:`, err)
+            }
+          })
+          
+          // Don't await - let images process in background
+          Promise.all(imageProcessingPromises).then(() => {
+            console.log('✅ Image processing batch completed')
+          }).catch(err => {
+            console.error('❌ Error in image processing batch:', err)
+          })
+        } else {
+          console.log('ℹ️ No products need image processing')
+        }
+
         // Step 4: Trigger continuous AI processing for ALL unprocessed products
         console.log('Starting continuous AI processing for all unprocessed products...')
         

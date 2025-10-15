@@ -24,6 +24,7 @@ interface Product {
   año_desde: string | null;
   año_hasta: string | null;
   raw_data?: any;
+  processed_image_url?: string | null;
 }
 
 const Index = () => {
