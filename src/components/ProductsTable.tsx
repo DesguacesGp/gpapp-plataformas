@@ -94,16 +94,27 @@ export const ProductsTable = ({
 
     // Fetch unique articulos
     const loadArticulos = async () => {
-      const { data, error } = await supabase
-        .from('vauner_products')
-        .select('articulo')
-        .not('articulo', 'is', null)
-        .order('articulo', { ascending: true });
+      let allArticulos: string[] = [];
+      let from = 0;
+      const pageSize = 1000;
+      
+      while (true) {
+        const { data, error } = await supabase
+          .from('vauner_products')
+          .select('articulo')
+          .not('articulo', 'is', null)
+          .range(from, from + pageSize - 1);
 
-      if (!error && data) {
-        const uniqueArticulos = [...new Set(data.map(p => p.articulo).filter(Boolean))];
-        setArticulos(uniqueArticulos as string[]);
+        if (error || !data || data.length === 0) break;
+        
+        allArticulos = [...allArticulos, ...data.map(p => p.articulo).filter(Boolean) as string[]];
+        
+        if (data.length < pageSize) break;
+        from += pageSize;
       }
+      
+      const uniqueArticulos = [...new Set(allArticulos)].sort();
+      setArticulos(uniqueArticulos);
     };
 
     loadCategories();
