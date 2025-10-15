@@ -34,6 +34,7 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isProcessingAll, setIsProcessingAll] = useState(false);
+  const [isProcessingImages, setIsProcessingImages] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   
   // Pagination and filters
@@ -41,6 +42,7 @@ const Index = () => {
   const [totalProducts, setTotalProducts] = useState(0);
   const [totalWithImages, setTotalWithImages] = useState(0);
   const [processedProducts, setProcessedProducts] = useState(0);
+  const [imageStats, setImageStats] = useState({ processed: 0, pending: 0, none: 0 });
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [articuloFilter, setArticuloFilter] = useState<string>("all");
@@ -195,6 +197,18 @@ const Index = () => {
       });
 
       setProducts(productsWithFinalPrice);
+
+      // Get image stats
+      const { data: allProducts } = await supabase
+        .from('vauner_products')
+        .select('processed_image_url, raw_data');
+      
+      if (allProducts) {
+        const processed = allProducts.filter(p => p.processed_image_url).length;
+        const pending = allProducts.filter(p => !p.processed_image_url && (p.raw_data as any)?.image).length;
+        const none = allProducts.filter(p => !(p.raw_data as any)?.image).length;
+        setImageStats({ processed, pending, none });
+      }
     } catch (error: any) {
       console.error('Error loading products:', error);
       toast.error('Error al cargar productos: ' + error.message);
@@ -278,19 +292,42 @@ const Index = () => {
       const recoveryInfo = data.recovery_events?.length > 0 
         ? ` (${data.recovery_events.length} eventos de recuperación)` 
         : '';
-
-      if (data.remaining === 0) {
-        toast.success('✅ No hay productos pendientes de procesar' + recoveryInfo);
+      
+      if (data.active_queue) {
+        toast.success(`✅ ${data.message}${recoveryInfo}`);
       } else {
-        toast.success(`✅ Procesamiento reanudado. ${data.remaining} productos pendientes.` + recoveryInfo);
+        toast.info(`ℹ️ ${data.message}`);
       }
       
-      setTimeout(() => loadProducts(), 2000);
     } catch (error: any) {
       console.error('Error resuming processing:', error);
-      toast.error('Error al reanudar: ' + error.message);
+      toast.error('Error al reanudar procesamiento: ' + error.message);
     } finally {
       setIsProcessingAll(false);
+    }
+  };
+
+  // Función para procesar imágenes pendientes
+  const processImages = async () => {
+    try {
+      setIsProcessingImages(true);
+      toast.info("🖼️ Procesando imágenes pendientes...");
+      
+      const { data, error } = await supabase.functions.invoke('vauner-sync', {
+        body: { action: 'process_images' }
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        toast.success(data.message || "✅ Imágenes procesadas correctamente");
+        setTimeout(() => loadProducts(), 2000);
+      }
+    } catch (error: any) {
+      console.error('Error:', error);
+      toast.error(error.message || "Error al procesar imágenes");
+    } finally {
+      setIsProcessingImages(false);
     }
   };
 
@@ -507,7 +544,7 @@ const Index = () => {
           </p>
         </div>
 
-        <div className="grid gap-6 mb-6 md:grid-cols-3">
+        <div className="grid gap-6 mb-6 md:grid-cols-4">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium">Total Productos</CardTitle>
@@ -543,6 +580,31 @@ const Index = () => {
               </p>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <ImageIcon className="h-4 w-4" />
+                Estado de Imágenes
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between items-center">
+                  <span className="text-green-600 font-medium">✅ Procesadas:</span>
+                  <span className="font-bold">{imageStats.processed}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-yellow-600 font-medium">⏳ Pendientes:</span>
+                  <span className="font-bold">{imageStats.pending}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">❌ Sin imagen:</span>
+                  <span className="font-bold">{imageStats.none}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <Card>
@@ -563,6 +625,15 @@ const Index = () => {
                 >
                   <RefreshCw className={`mr-2 h-5 w-5 ${isSyncing ? 'animate-spin' : ''}`} />
                   {isSyncing ? 'Sincronizando...' : 'Actualizar desde Vauner'}
+                </Button>
+                <Button
+                  onClick={processImages}
+                  variant="outline"
+                  disabled={isProcessingImages || imageStats.pending === 0}
+                  size="lg"
+                >
+                  <ImageIcon className={`mr-2 h-5 w-5 ${isProcessingImages ? 'animate-spin' : ''}`} />
+                  {isProcessingImages ? 'Procesando...' : `🔄 Procesar Imágenes (${imageStats.pending})`}
                 </Button>
                 <Button
                   onClick={processEverythingWithAI}

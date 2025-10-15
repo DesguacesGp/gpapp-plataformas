@@ -52,27 +52,24 @@ Deno.serve(async (req) => {
       throw new Error('Unsupported image format - cannot process GIF animations')
     }
     
-    console.log(`📐 Original dimensions: ${image.width}x${image.height}`)
 
     // Step 3: Create 1000x1000 canvas and scale image to 85%
     const canvasSize = 1000
     const imageSize = Math.round(canvasSize * 0.85) // 850px
     
-    // Scale image to fit within 850x850 maintaining aspect ratio
+    console.log(`📐 Original dimensions: ${image.width}x${image.height}`)
+    
+    // SIEMPRE escalar para que el lado más largo sea exactamente 850px
     let scaledWidth = image.width
     let scaledHeight = image.height
     
-    if (scaledWidth > imageSize || scaledHeight > imageSize) {
-      if (scaledWidth > scaledHeight) {
-        scaledHeight = Math.round((scaledHeight * imageSize) / scaledWidth)
-        scaledWidth = imageSize
-      } else {
-        scaledWidth = Math.round((scaledWidth * imageSize) / scaledHeight)
-        scaledHeight = imageSize
-      }
-    }
+    const maxDimension = Math.max(scaledWidth, scaledHeight)
+    const scaleFactor = imageSize / maxDimension
     
-    console.log(`🔄 Scaling product to: ${scaledWidth}x${scaledHeight}`)
+    scaledWidth = Math.round(scaledWidth * scaleFactor)
+    scaledHeight = Math.round(scaledHeight * scaleFactor)
+    
+    console.log(`🔄 Scaling to 85%: ${scaledWidth}x${scaledHeight} (factor: ${scaleFactor.toFixed(2)}x)`)
     image.resize(scaledWidth, scaledHeight)
     
     // Create white 1000x1000 canvas
@@ -83,7 +80,7 @@ Deno.serve(async (req) => {
     const offsetX = Math.round((canvasSize - scaledWidth) / 2)
     const offsetY = Math.round((canvasSize - scaledHeight) / 2)
     
-    console.log(`📍 Positioning at: (${offsetX}, ${offsetY})`)
+    console.log(`📍 Centering at: (${offsetX}, ${offsetY})`)
     canvas.composite(image, offsetX, offsetY)
 
     // Step 4: Convert to JPEG with 90% quality

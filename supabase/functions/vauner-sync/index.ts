@@ -29,7 +29,78 @@ Deno.serve(async (req) => {
 
     const { action, categories } = await req.json()
 
-    console.log('Vauner sync request:', { action, categories })
+    console.log('📥 Request action:', action)
+
+    // Nueva acción: Procesar solo imágenes pendientes
+    if (action === 'process_images') {
+      console.log('🖼️ Processing pending images...')
+      
+      const { data: pendingProducts, error: fetchError } = await supabaseClient
+        .from('vauner_products')
+        .select('id, sku, raw_data')
+        .is('processed_image_url', null)
+        .not('raw_data->image', 'is', null)
+        .limit(50) // Batch de 50 para evitar timeouts
+      
+      if (fetchError) {
+        console.error('❌ Error fetching pending products:', fetchError)
+        throw fetchError
+      }
+      
+      console.log(`📋 Found ${pendingProducts?.length || 0} products with pending images`)
+      
+      let processed = 0
+      let failed = 0
+      
+      for (const product of pendingProducts || []) {
+        try {
+          const vaunerImageUrl = product.raw_data.image
+          const vaunerBaseUrl = 'https://www.vauner.pt'
+          
+          console.log(`🖼️ Processing image for SKU: ${product.sku}`)
+          
+          const { data: imageResult, error: imageError } = await supabaseClient.functions.invoke(
+            'process-product-image',
+            {
+              body: {
+                vaunerImageUrl,
+                sku: product.sku,
+                vaunerBaseUrl
+              }
+            }
+          )
+          
+          if (imageError || !imageResult?.success) {
+            console.error(`❌ Failed to process ${product.sku}:`, imageError)
+            failed++
+            continue
+          }
+          
+          await supabaseClient
+            .from('vauner_products')
+            .update({ processed_image_url: imageResult.url })
+            .eq('id', product.id)
+          
+          processed++
+          console.log(`✅ Processed ${processed}/${pendingProducts.length}`)
+          
+        } catch (error) {
+          console.error(`❌ Error processing ${product.sku}:`, error)
+          failed++
+        }
+      }
+      
+      const message = `✅ Procesadas ${processed} imágenes${failed > 0 ? `, ${failed} fallaron` : ''}`
+      
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message,
+          stats: { processed, failed, total: pendingProducts?.length || 0 }
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     // Handle resume_processing action
     if (action === 'resume_processing') {

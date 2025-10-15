@@ -446,11 +446,11 @@ export const ProductsTable = ({
                           Ver imagen
                         </a>
                       ) : product.raw_data?.image ? (
-                        <Badge variant="secondary" className="text-xs">
-                          ⏳ Procesando
+                        <Badge variant="outline" className="border-yellow-500 text-yellow-600 text-xs">
+                          ⏳ Pendiente
                         </Badge>
                       ) : (
-                        <Badge variant="default">Sí</Badge>
+                        <Badge variant="secondary" className="text-gray-500 text-xs">❌ Sin imagen</Badge>
                       )
                     ) : (
                       <Badge variant="secondary">No</Badge>
