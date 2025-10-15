@@ -428,7 +428,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_image_statistics: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          none_count: number
+          pending_count: number
+          processed_count: number
+          total_count: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
