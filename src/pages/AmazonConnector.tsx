@@ -672,7 +672,7 @@ const AmazonConnector = () => {
         'No', // ¿Están incluidas las baterías?
         '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', // Batería, materiales peligrosos
         '', '', '', '', '', // Peso, duración
-        '', // URL de la imagen principal
+        product.raw_data?.image ? `https://www.vauner.pt/${product.raw_data.image}` : '', // URL de la imagen principal
         '', '', '', '', '', '', '', '', '', '', '', '', '', '', '' // Dimensiones
       ];
     });
