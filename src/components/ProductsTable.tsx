@@ -43,6 +43,8 @@ interface ProductsTableProps {
   onSearchChange: (search: string) => void;
   categoryFilter: string;
   onCategoryChange: (category: string) => void;
+  articuloFilter: string;
+  onArticuloChange: (articulo: string) => void;
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
@@ -59,6 +61,8 @@ export const ProductsTable = ({
   onSearchChange,
   categoryFilter,
   onCategoryChange,
+  articuloFilter,
+  onArticuloChange,
   currentPage,
   totalPages,
   onPageChange,
@@ -70,8 +74,9 @@ export const ProductsTable = ({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [localSearch, setLocalSearch] = useState(searchTerm);
 
-  // Get enabled categories from database
+  // Get enabled categories and articulos from database
   const [categories, setCategories] = useState<string[]>([]);
+  const [articulos, setArticulos] = useState<string[]>([]);
 
   useEffect(() => {
     // Fetch enabled categories from category_config table
@@ -87,7 +92,22 @@ export const ProductsTable = ({
       }
     };
 
+    // Fetch unique articulos
+    const loadArticulos = async () => {
+      const { data, error } = await supabase
+        .from('vauner_products')
+        .select('articulo')
+        .not('articulo', 'is', null)
+        .order('articulo', { ascending: true });
+
+      if (!error && data) {
+        const uniqueArticulos = [...new Set(data.map(p => p.articulo).filter(Boolean))];
+        setArticulos(uniqueArticulos as string[]);
+      }
+    };
+
     loadCategories();
+    loadArticulos();
   }, []);
 
   // Debounce search
@@ -248,6 +268,16 @@ export const ProductsTable = ({
           <option value="all">Todas las categorías</option>
           {categories.map(cat => (
             <option key={cat} value={cat}>{cat}</option>
+          ))}
+        </select>
+        <select
+          value={articuloFilter}
+          onChange={(e) => onArticuloChange(e.target.value)}
+          className="px-4 py-2 border rounded-md bg-background"
+        >
+          <option value="all">Todos los artículos</option>
+          {articulos.map(art => (
+            <option key={art} value={art}>{art}</option>
           ))}
         </select>
       </div>

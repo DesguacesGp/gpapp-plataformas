@@ -42,6 +42,7 @@ const Index = () => {
   const [processedProducts, setProcessedProducts] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [articuloFilter, setArticuloFilter] = useState<string>("all");
   const [sortField, setSortField] = useState<string>("ai_processed");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const productsPerPage = 20;
@@ -111,6 +112,11 @@ const Index = () => {
       // Apply category filter
       if (categoryFilter !== "all") {
         query = query.eq('category', categoryFilter);
+      }
+
+      // Apply articulo filter
+      if (articuloFilter !== "all") {
+        query = query.eq('articulo', articuloFilter);
       }
 
       // Get total count for pagination
@@ -432,7 +438,7 @@ const Index = () => {
     if (!isCheckingAuth) {
       loadProducts();
     }
-  }, [isCheckingAuth, currentPage, searchTerm, categoryFilter, sortField, sortDirection]);
+  }, [isCheckingAuth, currentPage, searchTerm, categoryFilter, articuloFilter, sortField, sortDirection]);
 
   const handleSearchChange = (search: string) => {
     setSearchTerm(search);
@@ -441,6 +447,11 @@ const Index = () => {
 
   const handleCategoryChange = (category: string) => {
     setCategoryFilter(category);
+    setCurrentPage(1); // Reset to first page on filter change
+  };
+
+  const handleArticuloChange = (articulo: string) => {
+    setArticuloFilter(articulo);
     setCurrentPage(1); // Reset to first page on filter change
   };
 
@@ -601,6 +612,8 @@ const Index = () => {
                 onSearchChange={handleSearchChange}
                 categoryFilter={categoryFilter}
                 onCategoryChange={handleCategoryChange}
+                articuloFilter={articuloFilter}
+                onArticuloChange={handleArticuloChange}
                 currentPage={currentPage}
                 totalPages={totalPages}
                 onPageChange={setCurrentPage}
