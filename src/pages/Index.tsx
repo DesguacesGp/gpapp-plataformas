@@ -34,7 +34,6 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isProcessingAll, setIsProcessingAll] = useState(false);
-  const [isProcessingImages, setIsProcessingImages] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   
   // Pagination and filters
@@ -248,12 +247,51 @@ const Index = () => {
     }
   };
 
-  // Función que procesa con IA usando el sistema de colas (batch size reducido a 10)
+  // Función unificada: procesa TODAS las imágenes y luego TODO con IA
   const processEverythingWithAI = async () => {
     setIsProcessingAll(true);
     
     try {
-      toast.info('🤖 Iniciando procesamiento continuo con IA (batches de 50 productos)...');
+      // PASO 1: Procesar TODAS las imágenes pendientes en loops de 50
+      toast.info('🖼️ Paso 1/2: Procesando imágenes pendientes...');
+      
+      let totalImagesProcessed = 0;
+      let hasMoreImages = true;
+      let batchCount = 0;
+      
+      while (hasMoreImages) {
+        batchCount++;
+        console.log(`📦 Processing image batch ${batchCount}...`);
+        
+        const { data: imageResult, error: imageError } = await supabase.functions.invoke('vauner-sync', {
+          body: { action: 'process_images' }
+        });
+        
+        if (imageError) {
+          console.error('Error processing images:', imageError);
+          toast.error(`Error en batch de imágenes ${batchCount}: ${imageError.message}`);
+          break; // Continuar con IA aunque fallen algunas imágenes
+        }
+        
+        const processed = imageResult?.stats?.processed || 0;
+        totalImagesProcessed += processed;
+        hasMoreImages = processed > 0;
+        
+        if (hasMoreImages) {
+          toast.info(`🖼️ Procesadas ${totalImagesProcessed} imágenes...`);
+          // Pequeño delay entre batches para no saturar
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+      
+      if (totalImagesProcessed > 0) {
+        toast.success(`✅ ${totalImagesProcessed} imágenes procesadas`);
+      } else {
+        toast.info('ℹ️ No hay imágenes pendientes de procesar');
+      }
+      
+      // PASO 2: Procesar TODOS los productos con IA
+      toast.info('🤖 Paso 2/2: Iniciando procesamiento con IA (batches de 50)...');
       
       // Crear registro en processing_queue
       const { data: queueData, error: queueError } = await supabase
@@ -269,76 +307,21 @@ const Index = () => {
 
       if (queueError) throw queueError;
 
-      // Llamar a process-products una sola vez con el queueId
+      // Llamar a process-products con el queueId
       const { error: processError } = await supabase.functions.invoke('process-products', {
         body: { queueId: queueData.id }
       });
 
       if (processError) throw processError;
 
-      toast.success('✅ Procesamiento iniciado. El sistema continuará automáticamente en segundo plano.');
+      toast.success('✅ Procesamiento completo iniciado. El sistema continuará automáticamente en segundo plano.');
       
       setTimeout(() => loadProducts(), 2000);
     } catch (error: any) {
-      console.error('Error starting AI process:', error);
-      toast.error('Error al iniciar el proceso: ' + error.message);
+      console.error('Error in complete processing:', error);
+      toast.error('Error: ' + error.message);
     } finally {
       setIsProcessingAll(false);
-    }
-  };
-
-  // Función para reanudar procesamiento interrumpido
-  const resumeProcessing = async () => {
-    setIsProcessingAll(true);
-    
-    try {
-      toast.info('🔄 Reanudando procesamiento...');
-      
-      const { data, error } = await supabase.functions.invoke('resume-processing', {
-        body: { triggered_by: 'manual' }
-      });
-
-      if (error) throw error;
-
-      const recoveryInfo = data.recovery_events?.length > 0 
-        ? ` (${data.recovery_events.length} eventos de recuperación)` 
-        : '';
-      
-      if (data.active_queue) {
-        toast.success(`✅ ${data.message}${recoveryInfo}`);
-      } else {
-        toast.info(`ℹ️ ${data.message}`);
-      }
-      
-    } catch (error: any) {
-      console.error('Error resuming processing:', error);
-      toast.error('Error al reanudar procesamiento: ' + error.message);
-    } finally {
-      setIsProcessingAll(false);
-    }
-  };
-
-  // Función para procesar imágenes pendientes
-  const processImages = async () => {
-    try {
-      setIsProcessingImages(true);
-      toast.info("🖼️ Procesando imágenes pendientes...");
-      
-      const { data, error } = await supabase.functions.invoke('vauner-sync', {
-        body: { action: 'process_images' }
-      });
-
-      if (error) throw error;
-
-      if (data.success) {
-        toast.success(data.message || "✅ Imágenes procesadas correctamente");
-        setTimeout(() => loadProducts(), 2000);
-      }
-    } catch (error: any) {
-      console.error('Error:', error);
-      toast.error(error.message || "Error al procesar imágenes");
-    } finally {
-      setIsProcessingImages(false);
     }
   };
 
@@ -638,31 +621,16 @@ const Index = () => {
                   {isSyncing ? 'Sincronizando...' : 'Actualizar desde Vauner'}
                 </Button>
                 <Button
-                  onClick={processImages}
-                  variant="outline"
-                  disabled={isProcessingImages || imageStats.pending === 0}
-                  size="lg"
-                >
-                  <ImageIcon className={`mr-2 h-5 w-5 ${isProcessingImages ? 'animate-spin' : ''}`} />
-                  {isProcessingImages ? 'Procesando...' : `🔄 Procesar Imágenes (${imageStats.pending})`}
-                </Button>
-                <Button
                   onClick={processEverythingWithAI}
                   variant="default"
                   disabled={isProcessingAll || isSyncing}
                   size="lg"
                 >
                   <Sparkles className={`mr-2 h-5 w-5 ${isProcessingAll ? 'animate-pulse' : ''}`} />
-                  {isProcessingAll ? 'Procesando con IA...' : 'Procesar con IA'}
-                </Button>
-                <Button
-                  onClick={resumeProcessing}
-                  variant="outline"
-                  disabled={isProcessingAll || isSyncing}
-                  size="lg"
-                >
-                  <RefreshCw className="mr-2 h-5 w-5" />
-                  Reanudar Proceso
+                  {isProcessingAll 
+                    ? 'Procesando (Imágenes + IA)...' 
+                    : `Procesar Todo (${imageStats.pending + (totalWithImages - processedProducts)} pendientes)`
+                  }
                 </Button>
                 <Button
                   onClick={exportSelected}
