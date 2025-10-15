@@ -87,7 +87,12 @@ Deno.serve(async (req) => {
 
     // Parse CSV
     const lines = csv.split('\n').filter(line => line.trim());
-    const headers = lines[0].split(';').map(h => h.trim());
+    
+    // Auto-detect delimiter (comma or semicolon)
+    const delimiter = lines[0].includes(';') ? ';' : ',';
+    console.log(`📋 Using delimiter: "${delimiter}"`);
+    
+    const headers = lines[0].split(delimiter).map(h => h.trim());
     
     console.log(`📊 Found ${lines.length - 1} rows to process`);
     console.log(`📋 Headers: ${headers.join(', ')}`);
@@ -113,7 +118,7 @@ Deno.serve(async (req) => {
     // Process rows (skip header)
     for (let i = 1; i < lines.length; i++) {
       try {
-        const values = lines[i].split(';').map(v => v.trim());
+        const values = lines[i].split(delimiter).map(v => v.trim());
         
         const vauner_sku = values[referenciaVaunerIdx];
         const modeloString = values[modeloIdx];
@@ -197,7 +202,7 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('❌ Import error:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { 
         status: 500, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
