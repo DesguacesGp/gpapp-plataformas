@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { RefreshCw, Settings, Download, LogOut, Sparkles, DollarSign, Package, Image as ImageIcon } from "lucide-react";
+import { RefreshCw, Settings, Download, LogOut, Sparkles, DollarSign, Package, Image as ImageIcon, Table } from "lucide-react";
 import { ProductsTable } from "@/components/ProductsTable";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -43,7 +43,9 @@ const Index = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [isProcessingAll, setIsProcessingAll] = useState(false);
+  const [isProcessingImages, setIsProcessingImages] = useState(false);
+  const [isGeneratingTables, setIsGeneratingTables] = useState(false);
+  const [isProcessingAI, setIsProcessingAI] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   
   // Pagination and filters
@@ -51,6 +53,7 @@ const Index = () => {
   const [totalProducts, setTotalProducts] = useState(0);
   const [totalWithImages, setTotalWithImages] = useState(0);
   const [processedProducts, setProcessedProducts] = useState(0);
+  const [productsWithOem, setProductsWithOem] = useState(0);
   const [imageStats, setImageStats] = useState({ processed: 0, pending: 0, none: 0 });
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -267,6 +270,15 @@ const Index = () => {
           total: stats.total_count
         });
       }
+
+      // Get count of products with OEM references
+      const { count: oemCount } = await supabase
+        .from('vehicle_compatibility')
+        .select('vauner_sku', { count: 'exact', head: true })
+        .not('referencia_oem', 'is', null)
+        .neq('referencia_oem', '');
+
+      setProductsWithOem(oemCount || 0);
     } catch (error: any) {
       console.error('Error loading products:', error);
       toast.error('Error al cargar productos: ' + error.message);
@@ -295,13 +307,11 @@ const Index = () => {
     }
   };
 
-  // Función unificada: procesa imágenes de producto, imágenes de compatibilidad, y luego IA
-  const processEverythingWithAI = async () => {
-    setIsProcessingAll(true);
+  const processProductImages = async () => {
+    setIsProcessingImages(true);
     
     try {
-      // PASO 1: Procesar TODAS las imágenes de productos pendientes
-      toast.info('🖼️ Paso 1/3: Procesando imágenes de productos...');
+      toast.info('🖼️ Procesando imágenes de productos...');
       
       let totalImagesProcessed = 0;
       let hasMoreImages = true;
@@ -337,10 +347,21 @@ const Index = () => {
         toast.info('ℹ️ No hay imágenes de productos pendientes');
       }
       
-      // PASO 2: Generar TODAS las imágenes de tablas de compatibilidad pendientes
-      toast.info('📊 Paso 2/3: Generando tablas de compatibilidad...');
+      setTimeout(() => loadProducts(), 2000);
+    } catch (error: any) {
+      console.error('Error processing images:', error);
+      toast.error('Error: ' + error.message);
+    } finally {
+      setIsProcessingImages(false);
+    }
+  };
+
+  const generateCompatibilityTables = async () => {
+    setIsGeneratingTables(true);
+    
+    try {
+      toast.info('📊 Generando tablas de compatibilidad...');
       
-      // Get products that have compatibility data but no compatibility image
       const { data: productsNeedingCompatImage, error: compatError } = await supabase
         .from('vauner_products')
         .select('id, sku')
@@ -357,12 +378,10 @@ const Index = () => {
         let compatImagesGenerated = 0;
         let compatImagesFailed = 0;
         
-        // Process in batches of 10 to avoid overwhelming the system
         const compatBatchSize = 10;
         for (let i = 0; i < productsNeedingCompatImage.length; i += compatBatchSize) {
           const batch = productsNeedingCompatImage.slice(i, i + compatBatchSize);
           
-          // Process batch in parallel
           await Promise.all(
             batch.map(async (product) => {
               try {
@@ -384,12 +403,10 @@ const Index = () => {
             })
           );
           
-          // Update toast with progress
           if (i + compatBatchSize < productsNeedingCompatImage.length) {
             toast.info(`📊 Generadas ${compatImagesGenerated}/${productsNeedingCompatImage.length} tablas...`);
           }
           
-          // Small delay between batches
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
         
@@ -400,10 +417,21 @@ const Index = () => {
         toast.info('ℹ️ No hay tablas de compatibilidad pendientes de generar');
       }
       
-      // PASO 3: Procesar TODOS los productos con IA
-      toast.info('🤖 Paso 3/3: Iniciando procesamiento con IA (batches de 50)...');
+      setTimeout(() => loadProducts(), 2000);
+    } catch (error: any) {
+      console.error('Error generating compatibility tables:', error);
+      toast.error('Error: ' + error.message);
+    } finally {
+      setIsGeneratingTables(false);
+    }
+  };
+
+  const processWithAI = async () => {
+    setIsProcessingAI(true);
+    
+    try {
+      toast.info('🤖 Iniciando procesamiento con IA (solo productos con Ref OEM, batches de 50)...');
       
-      // Crear registro en processing_queue
       const { data: queueData, error: queueError } = await supabase
         .from('processing_queue')
         .insert({
@@ -417,21 +445,20 @@ const Index = () => {
 
       if (queueError) throw queueError;
 
-      // Llamar a process-products con el queueId
       const { error: processError } = await supabase.functions.invoke('process-products', {
         body: { queueId: queueData.id }
       });
 
       if (processError) throw processError;
 
-      toast.success('✅ Procesamiento completo iniciado. El sistema continuará automáticamente en segundo plano.');
+      toast.success('✅ Procesamiento con IA iniciado (solo productos con Ref OEM). El sistema continuará automáticamente en segundo plano.');
       
       setTimeout(() => loadProducts(), 2000);
     } catch (error: any) {
-      console.error('Error in complete processing:', error);
+      console.error('Error in AI processing:', error);
       toast.error('Error: ' + error.message);
     } finally {
-      setIsProcessingAll(false);
+      setIsProcessingAI(false);
     }
   };
 
@@ -717,6 +744,18 @@ const Index = () => {
               </div>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium">Con Ref OEM</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{productsWithOem}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Productos con referencias OEM
+              </p>
+            </CardContent>
+          </Card>
         </div>
 
         <Card>
@@ -732,22 +771,46 @@ const Index = () => {
                 <Button
                   onClick={syncFromVauner}
                   variant="outline"
-                  disabled={isSyncing || isProcessingAll}
+                  disabled={isSyncing || isProcessingImages || isGeneratingTables || isProcessingAI}
                   size="lg"
                 >
                   <RefreshCw className={`mr-2 h-5 w-5 ${isSyncing ? 'animate-spin' : ''}`} />
                   {isSyncing ? 'Sincronizando...' : 'Actualizar desde Vauner'}
                 </Button>
                 <Button
-                  onClick={processEverythingWithAI}
-                  variant="default"
-                  disabled={isProcessingAll || isSyncing}
+                  onClick={processProductImages}
+                  variant="outline"
+                  disabled={isProcessingImages || isSyncing}
                   size="lg"
                 >
-                  <Sparkles className={`mr-2 h-5 w-5 ${isProcessingAll ? 'animate-pulse' : ''}`} />
-                  {isProcessingAll 
-                    ? 'Procesando (Imágenes + IA)...' 
-                    : `Procesar Todo (${imageStats.pending + (totalWithImages - processedProducts)} pendientes)`
+                  <ImageIcon className={`mr-2 h-5 w-5 ${isProcessingImages ? 'animate-pulse' : ''}`} />
+                  {isProcessingImages 
+                    ? 'Procesando Imágenes...' 
+                    : `🖼️ Procesar Imágenes (${imageStats.pending} pendientes)`
+                  }
+                </Button>
+                <Button
+                  onClick={generateCompatibilityTables}
+                  variant="outline"
+                  disabled={isGeneratingTables || isSyncing}
+                  size="lg"
+                >
+                  <Table className={`mr-2 h-5 w-5 ${isGeneratingTables ? 'animate-pulse' : ''}`} />
+                  {isGeneratingTables 
+                    ? 'Generando Tablas...' 
+                    : `📊 Generar Tablas`
+                  }
+                </Button>
+                <Button
+                  onClick={processWithAI}
+                  variant="default"
+                  disabled={isProcessingAI || isSyncing}
+                  size="lg"
+                >
+                  <Sparkles className={`mr-2 h-5 w-5 ${isProcessingAI ? 'animate-pulse' : ''}`} />
+                  {isProcessingAI 
+                    ? 'Actualizando Títulos con OEM...' 
+                    : `🤖 Actualizar Títulos (Solo Ref OEM)`
                   }
                 </Button>
                 <Button

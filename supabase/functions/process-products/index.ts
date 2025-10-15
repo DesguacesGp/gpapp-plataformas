@@ -86,17 +86,34 @@ Deno.serve(async (req) => {
 
     const { productIds, queueId } = await req.json()
     
-    // Get next batch of products
+    // CRITICAL: Get SKUs with OEM references first
+    const { data: skusWithOem, error: oemError } = await supabaseClient
+      .from('vehicle_compatibility')
+      .select('vauner_sku')
+      .not('referencia_oem', 'is', null)
+      .neq('referencia_oem', '')
+
+    if (oemError) {
+      console.error('Error fetching SKUs with OEM:', oemError)
+      throw oemError
+    }
+
+    const oemSkuList = [...new Set(skusWithOem?.map(x => x.vauner_sku) || [])]
+    console.log(`📋 Found ${oemSkuList.length} unique SKUs with OEM references`)
+
+    // Get next batch of products (filtered by OEM)
     let productsToProcess = productIds
     if (!productsToProcess && queueId) {
-      // If no productIds provided, get next batch (reduced to 10 for reliability)
+      // If no productIds provided, get next batch filtered by OEM SKUs
       const { data: nextBatch } = await supabaseClient
         .from('vauner_products')
         .select('id')
+        .in('sku', oemSkuList)
         .is('translated_title', null)
         .limit(50)
       
       productsToProcess = nextBatch?.map(p => p.id) || []
+      console.log(`📦 Processing batch of ${productsToProcess.length} products with OEM references`)
     }
     
     console.log(`Processing batch - ProductIds: ${productsToProcess?.length}, QueueId: ${queueId}`)
@@ -117,11 +134,11 @@ Deno.serve(async (req) => {
       startHeartbeat(supabaseClient, queueId)
     }
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured')
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')
+    if (!OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY not configured in Supabase secrets')
     }
-    console.log('Lovable AI API Key configured:', LOVABLE_API_KEY ? 'Yes (length: ' + LOVABLE_API_KEY.length + ')' : 'No')
+    console.log('OpenAI API Key configured:', OPENAI_API_KEY ? 'Yes (length: ' + OPENAI_API_KEY.length + ')' : 'No')
 
     // Get products to process
     const { data: products, error: fetchError } = await supabaseClient
@@ -250,15 +267,15 @@ INSTRUCCIONES CRÍTICAS PARA USAR ESTOS DATOS:
         const maxRetries = 3
         
         while (retries <= maxRetries) {
-          // Call Lovable AI Gateway with Gemini model to process the product
-          aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          // Call OpenAI API with gpt-4o-mini model to process the product
+          aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+              'Authorization': `Bearer ${OPENAI_API_KEY}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              model: 'google/gemini-2.5-flash',
+              model: 'gpt-4o-mini',
               messages: [
               {
                 role: 'system',
@@ -285,37 +302,40 @@ Tu tarea es:
 1. Traducir la descripción del producto del portugués al español (ya tiene algunas traducciones aplicadas).
 
 2. Generar un título SEO LARGO Y DESCRIPTIVO (MÍNIMO 150 caracteres, óptimo 180-200 caracteres) siguiendo estas reglas:
-   - Estructura: TIPO_PIEZA + Posición_CON_LADO + "para" + MARCA + MODELO(S)_CON_AÑOS + Características_Técnicas + Compatible_OEM
-   - CRÍTICO: Si hay datos de compatibilidad CSV, DEBES usar TODOS los modelos con sus años en el título
+   - Estructura: TIPO_PIEZA + Posición_CON_LADO + "para" + MARCA + MODELO_PRINCIPAL + AÑOS + [MODELOS_SECUNDARIOS] + Características_Técnicas + Referencias_OEM
+   - CRÍTICO: Si hay un modelo PRINCIPAL (el primero de la lista), ponlo al inicio después de la marca
+   - CRÍTICO: Si hay modelos SECUNDARIOS (2º, 3º, etc.), añádelos después del modelo principal separados por coma: "Ford Focus (2010-2015), C-Max (2012), Kuga (2013-2016)"
+   - CRÍTICO: Si hay referencia OEM en los datos de compatibilidad CSV, incluir al final: "Ref OEM: 1234567890"
    - CRÍTICO: SIEMPRE usar "para" entre el artículo y la marca (ej: "Faro para Ford", "Piloto para Volkswagen")
    - CRÍTICO PARA PILOTOS: TODOS los pilotos DEBEN incluir "Sin Portalamparas" en el título
    - El patrón "AÑO-*" significa "desde ese año en adelante"
-   - DEBE incluir: tipo de pieza, posición clara (ej: "Derecho Lado Copiloto" o "Izquierdo Lado Conductor"), marca, todos los modelos con años
+   - DEBE incluir: tipo de pieza, posición clara (ej: "Derecho Lado Copiloto" o "Izquierdo Lado Conductor"), marca, modelo principal con años, modelos secundarios con años
    - AÑADIR keywords relevantes: "Compatible OEM", "Calidad OEM", "Alta Calidad", "Nuevo", "Aftermarket Premium", "Recambio", etc.
-   - Repetir marca y modelo si es necesario para llegar a 150+ caracteres
    - Incluir características técnicas específicas (eléctrico, térmico, con sensor, etc.)
    
    Ejemplos de títulos OPTIMIZADOS:
-   * "Faro Delantero Derecho Lado Copiloto para Ford Focus desde 2004 - Recambio Alta Calidad Compatible OEM para Ford Focus 04+ Faro Eléctrico Nuevo Aftermarket Premium"
-   * "Piloto Trasero Izquierdo Lado Conductor Sin Portalamparas para Renault Modus desde 2004 - Luz Trasera Compatible OEM para Renault Modus 2004+ Alta Calidad Nuevo Recambio"
-   * "Maneta Exterior Derecha Lado Copiloto para Mercedes Clase E W213 desde 2020 - Maneta Puerta Aftermarket para Mercedes Benz E W213 2020+ Compatible OEM Nueva"
+   * "Faro Delantero Derecho Lado Copiloto para Ford Focus (2004-2008), C-Max (2003-2007) - Ref OEM: 1234567 - Recambio Alta Calidad Compatible OEM Faro Eléctrico Nuevo Aftermarket Premium"
+   * "Piloto Trasero Izquierdo Lado Conductor Sin Portalamparas para Renault Modus (2004-2012), Clio III (2005-2009) - Ref OEM: 8200000000 - Luz Trasera Compatible OEM Alta Calidad Nuevo Recambio"
+   * "Retrovisor Derecho Lado Copiloto para Volkswagen Golf VI (2008-2013), Touran (2010-2015) - Ref OEM: 5K0857410 - Retrovisor Eléctrico Térmico Plegable Aftermarket Compatible OEM"
 
 3. Generar exactamente 5 bullet points optimizados para Amazon/eBay:
    - Cada bullet debe tener entre 150-200 caracteres
    - Primera letra en mayúscula, sin punto final
    - Incluir keywords naturalmente repetidas
    - SIEMPRE mencionar el lado cuando aplique: "Derecho (Lado Copiloto)" o "Izquierdo (Lado Conductor)"
+   - CRÍTICO: El PRIMER bullet point DEBE listar TODOS los modelos compatibles con sus años: "Compatible para Ford Focus (2004-2008), C-Max (2003-2007), Kuga (2008-2012)"
+   - CRÍTICO: El SEGUNDO bullet point DEBE incluir las referencias equivalentes disponibles: "Referencias equivalentes: OEM 1234567, ALKAR 6789012, JUMASA 9876543"
    - CRÍTICO PARA PILOTOS: UNO de los bullet points DEBE mencionar explícitamente "Sin Portalamparas"
    - Destacar compatibilidad OEM, calidad equivalente, características técnicas, facilidad de instalación
    - Usar emojis sutiles si es apropiado (✓, ⭐, 🚗)
    - SER HONESTO: mencionar que es aftermarket/compatible OEM, no original
    
    Ejemplo de bullet points:
-   * "✓ Compatible para Ford Focus desde 2004+ - Pieza DERECHA para lado COPILOTO - Recambio aftermarket calidad OEM equivalente que garantiza ajuste perfecto y funcionamiento óptimo"
-   * "⭐ Faro delantero derecho lado copiloto con tecnología eléctrica avanzada - Iluminación potente y duradera para máxima seguridad y visibilidad en carretera"
-   * "🚗 Instalación fácil y rápida sin modificaciones - Compatible con sistema eléctrico del vehículo, plug and play directo, no requiere herramientas especiales"
-   * "✓ Fabricado con materiales de alta resistencia UV y golpes - Óptica de policarbonato resistente y carcasa duradera que soporta condiciones climáticas extremas"
-   * "⭐ Sin Portalamparas incluido - Utiliza las lámparas de tu vehículo original, calidad OEM equivalente testada que cumple normativas europeas de homologación"
+   * "✓ Compatible para Ford Focus (2004-2008), C-Max (2003-2007) y Kuga (2008-2012) - Pieza DERECHA para lado COPILOTO - Recambio aftermarket calidad OEM equivalente que garantiza ajuste perfecto"
+   * "⭐ Referencias equivalentes: OEM 1234567890, ALKAR 6789012, JUMASA 9876543, GEIMEX 1357924 - Calidad testada y certificada que cumple normativas europeas de homologación"
+   * "🚗 Faro delantero derecho lado copiloto con tecnología eléctrica avanzada - Iluminación potente y duradera para máxima seguridad y visibilidad en carretera"
+   * "✓ Instalación fácil y rápida sin modificaciones - Compatible con sistema eléctrico del vehículo, plug and play directo, no requiere herramientas especiales"
+   * "⭐ Fabricado con materiales de alta resistencia UV y golpes - Óptica de policarbonato resistante y carcasa duradera que soporta condiciones climáticas extremas"
 
 4. EXTRAER información estructurada del producto (CRÍTICO - ANALIZA CUIDADOSAMENTE):
    
