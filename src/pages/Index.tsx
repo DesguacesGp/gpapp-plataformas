@@ -295,13 +295,13 @@ const Index = () => {
     }
   };
 
-  // Función unificada: procesa TODAS las imágenes y luego TODO con IA
+  // Función unificada: procesa imágenes de producto, imágenes de compatibilidad, y luego IA
   const processEverythingWithAI = async () => {
     setIsProcessingAll(true);
     
     try {
-      // PASO 1: Procesar TODAS las imágenes pendientes en loops de 50
-      toast.info('🖼️ Paso 1/2: Procesando imágenes pendientes...');
+      // PASO 1: Procesar TODAS las imágenes de productos pendientes
+      toast.info('🖼️ Paso 1/3: Procesando imágenes de productos...');
       
       let totalImagesProcessed = 0;
       let hasMoreImages = true;
@@ -318,7 +318,7 @@ const Index = () => {
         if (imageError) {
           console.error('Error processing images:', imageError);
           toast.error(`Error en batch de imágenes ${batchCount}: ${imageError.message}`);
-          break; // Continuar con IA aunque fallen algunas imágenes
+          break;
         }
         
         const processed = imageResult?.stats?.processed || 0;
@@ -326,20 +326,82 @@ const Index = () => {
         hasMoreImages = processed > 0;
         
         if (hasMoreImages) {
-          toast.info(`🖼️ Procesadas ${totalImagesProcessed} imágenes...`);
-          // Pequeño delay entre batches para no saturar
+          toast.info(`🖼️ Procesadas ${totalImagesProcessed} imágenes de productos...`);
           await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
       
       if (totalImagesProcessed > 0) {
-        toast.success(`✅ ${totalImagesProcessed} imágenes procesadas`);
+        toast.success(`✅ ${totalImagesProcessed} imágenes de productos procesadas`);
       } else {
-        toast.info('ℹ️ No hay imágenes pendientes de procesar');
+        toast.info('ℹ️ No hay imágenes de productos pendientes');
       }
       
-      // PASO 2: Procesar TODOS los productos con IA
-      toast.info('🤖 Paso 2/2: Iniciando procesamiento con IA (batches de 50)...');
+      // PASO 2: Generar TODAS las imágenes de tablas de compatibilidad pendientes
+      toast.info('📊 Paso 2/3: Generando tablas de compatibilidad...');
+      
+      // Get products that have compatibility data but no compatibility image
+      const { data: productsNeedingCompatImage, error: compatError } = await supabase
+        .from('vauner_products')
+        .select('id, sku')
+        .is('compatibility_image_url', null)
+        .not('marca', 'is', null);
+
+      if (compatError) {
+        console.error('Error fetching products needing compat images:', compatError);
+        toast.error('Error al buscar productos sin tabla de compatibilidad');
+      } else if (productsNeedingCompatImage && productsNeedingCompatImage.length > 0) {
+        console.log(`📊 Found ${productsNeedingCompatImage.length} products needing compatibility images`);
+        toast.info(`📊 Generando ${productsNeedingCompatImage.length} tablas de compatibilidad...`);
+        
+        let compatImagesGenerated = 0;
+        let compatImagesFailed = 0;
+        
+        // Process in batches of 10 to avoid overwhelming the system
+        const compatBatchSize = 10;
+        for (let i = 0; i < productsNeedingCompatImage.length; i += compatBatchSize) {
+          const batch = productsNeedingCompatImage.slice(i, i + compatBatchSize);
+          
+          // Process batch in parallel
+          await Promise.all(
+            batch.map(async (product) => {
+              try {
+                const { error: genError } = await supabase.functions.invoke('generate-compatibility-image', {
+                  body: { productId: product.id }
+                });
+                
+                if (genError) {
+                  console.error(`Failed to generate compat image for ${product.sku}:`, genError);
+                  compatImagesFailed++;
+                } else {
+                  compatImagesGenerated++;
+                  console.log(`✅ Generated compat image ${compatImagesGenerated}/${productsNeedingCompatImage.length}`);
+                }
+              } catch (error) {
+                console.error(`Error generating compat image for ${product.sku}:`, error);
+                compatImagesFailed++;
+              }
+            })
+          );
+          
+          // Update toast with progress
+          if (i + compatBatchSize < productsNeedingCompatImage.length) {
+            toast.info(`📊 Generadas ${compatImagesGenerated}/${productsNeedingCompatImage.length} tablas...`);
+          }
+          
+          // Small delay between batches
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        if (compatImagesGenerated > 0) {
+          toast.success(`✅ ${compatImagesGenerated} tablas de compatibilidad generadas${compatImagesFailed > 0 ? `, ${compatImagesFailed} fallaron` : ''}`);
+        }
+      } else {
+        toast.info('ℹ️ No hay tablas de compatibilidad pendientes de generar');
+      }
+      
+      // PASO 3: Procesar TODOS los productos con IA
+      toast.info('🤖 Paso 3/3: Iniciando procesamiento con IA (batches de 50)...');
       
       // Crear registro en processing_queue
       const { data: queueData, error: queueError } = await supabase

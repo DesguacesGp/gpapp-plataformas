@@ -131,12 +131,95 @@ Deno.serve(async (req) => {
 
     if (fetchError) throw fetchError
 
+    // Load vehicle compatibility data from CSV
+    const { data: compatibilityData } = await supabaseClient
+      .from('vehicle_compatibility')
+      .select('*')
+      .in('vauner_sku', products?.map(p => p.sku) || [])
+
+    // Create a map for quick lookup
+    const compatibilityMap = new Map()
+    compatibilityData?.forEach(compat => {
+      if (!compatibilityMap.has(compat.vauner_sku)) {
+        compatibilityMap.set(compat.vauner_sku, [])
+      }
+      compatibilityMap.get(compat.vauner_sku).push(compat)
+    })
+
+    console.log(`Loaded compatibility data for ${compatibilityMap.size} products`)
+
     const processedCount = { success: 0, failed: 0 }
 
     // Process products one by one to avoid rate limits
     for (const product of products) {
       try {
         console.log(`Processing product: ${product.sku}`)
+
+        // Get compatibility info for this product
+        const productCompatibility = compatibilityMap.get(product.sku) || []
+
+        // Prepare compatibility information for prompt
+        let compatibilityPrompt = ''
+        if (productCompatibility.length > 0) {
+          // Sort by created_at to identify principal model (first one)
+          const sortedCompat = [...productCompatibility].sort((a, b) => 
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          )
+          
+          const principalModel = sortedCompat[0]
+          const secondaryModels = sortedCompat.slice(1)
+          
+          // Format all models with years for title
+          const allModelsForTitle = sortedCompat.map(c => 
+            `${c.modelo} (${c.año_desde}-${c.año_hasta || 'actual'})`
+          ).join(' y ')
+          
+          // Get unique OEM references
+          const allOemRefs = [...new Set(
+            sortedCompat.map(c => c.referencia_oem).filter(Boolean)
+          )].join(', ')
+          
+          // Get unique equivalent references
+          const equivalentRefs = []
+          const alkarRefs = [...new Set(sortedCompat.map(c => c.referencia_alkar).filter(Boolean))]
+          const jumasaRefs = [...new Set(sortedCompat.map(c => c.referencia_jumasa).filter(Boolean))]
+          const geimexRefs = [...new Set(sortedCompat.map(c => c.referencia_geimex).filter(Boolean))]
+          
+          if (alkarRefs.length > 0) equivalentRefs.push(...alkarRefs.map(r => `ALKAR ${r}`))
+          if (jumasaRefs.length > 0) equivalentRefs.push(...jumasaRefs.map(r => `JUMASA ${r}`))
+          if (geimexRefs.length > 0) equivalentRefs.push(...geimexRefs.map(r => `GEIMEX ${r}`))
+          
+          const allEquivalentRefs = equivalentRefs.join(', ')
+          
+          compatibilityPrompt = `
+
+DATOS DE COMPATIBILIDAD DESDE CSV (FUENTE DE VERDAD):
+- Marca del vehículo: ${principalModel.marca}
+- Modelo PRINCIPAL: ${principalModel.modelo} (${principalModel.año_desde}-${principalModel.año_hasta || 'actual'})
+${secondaryModels.length > 0 ? `- Modelos SECUNDARIOS: ${secondaryModels.map(m => `${m.modelo} (${m.año_desde}-${m.año_hasta || 'actual'})`).join(', ')}` : ''}
+- Referencias OEM: ${allOemRefs || 'No disponibles'}
+- Referencias equivalentes: ${allEquivalentRefs || 'No disponibles'}
+
+INSTRUCCIONES CRÍTICAS PARA USAR ESTOS DATOS:
+
+1. TÍTULO:
+   - DEBES mencionar el modelo principal: "${principalModel.modelo}"
+   - Si hay modelos secundarios, DEBES incluirlos también en el título con sus años específicos
+   - Formato sugerido: "para ${principalModel.marca} ${allModelsForTitle}"
+   - Ejemplo: "Piloto Trasero Derecho para Skoda Octavia (2004-2008) y Octavia 4P/Combi (2008-2013)"
+
+2. TERCER BULLET POINT (compatibilidad):
+   - DEBE mencionar TODOS los modelos con sus años: ${allModelsForTitle}
+   - DEBE incluir las referencias OEM si existen: ${allOemRefs}
+   - DEBE incluir las referencias equivalentes si existen: ${allEquivalentRefs}
+   - Formato sugerido: "🚗 Compatible con ${allModelsForTitle} - Referencias OEM: ${allOemRefs} - Equivalentes: ${allEquivalentRefs} - Instalación directa"
+
+3. CAMPOS ESTRUCTURADOS:
+   - marca: "${principalModel.marca}"
+   - modelo: "${principalModel.modelo}"
+   - Los campos año_desde y año_hasta NO los generes (ya se actualizarán automáticamente desde el CSV)
+`
+        }
         
         // Apply dictionary replacements
         let translatedDesc = product.description
@@ -200,11 +283,12 @@ Tu tarea es:
 1. Traducir la descripción del producto del portugués al español (ya tiene algunas traducciones aplicadas).
 
 2. Generar un título SEO LARGO Y DESCRIPTIVO (MÍNIMO 150 caracteres, óptimo 180-200 caracteres) siguiendo estas reglas:
-   - Estructura: TIPO_PIEZA + Posición_CON_LADO + "para" + MARCA + MODELO + Años_Compatibilidad + Características_Técnicas + Compatible_OEM
+   - Estructura: TIPO_PIEZA + Posición_CON_LADO + "para" + MARCA + MODELO(S)_CON_AÑOS + Características_Técnicas + Compatible_OEM
+   - CRÍTICO: Si hay datos de compatibilidad CSV, DEBES usar TODOS los modelos con sus años en el título
    - CRÍTICO: SIEMPRE usar "para" entre el artículo y la marca (ej: "Faro para Ford", "Piloto para Volkswagen")
    - CRÍTICO PARA PILOTOS: TODOS los pilotos DEBEN incluir "Sin Portalamparas" en el título
    - El patrón "AÑO-*" significa "desde ese año en adelante"
-   - DEBE incluir: tipo de pieza, posición clara (ej: "Derecho Lado Copiloto" o "Izquierdo Lado Conductor"), marca, modelo, años
+   - DEBE incluir: tipo de pieza, posición clara (ej: "Derecho Lado Copiloto" o "Izquierdo Lado Conductor"), marca, todos los modelos con años
    - AÑADIR keywords relevantes: "Compatible OEM", "Calidad OEM", "Alta Calidad", "Nuevo", "Aftermarket Premium", "Recambio", etc.
    - Repetir marca y modelo si es necesario para llegar a 150+ caracteres
    - Incluir características técnicas específicas (eléctrico, térmico, con sensor, etc.)
@@ -265,15 +349,15 @@ Responde SOLO con un JSON válido en este formato exacto:
 
 NO agregues texto adicional, SOLO el JSON.`
               },
-              {
-                role: 'user',
-                content: `Procesa este producto:
+        {
+          role: 'user',
+          content: `Procesa este producto:
 SKU: ${product.sku}
 Descripción: ${translatedDesc}
 Categoría: ${product.category}
 Precio: ${product.price}€
-Stock: ${product.stock}`
-              }
+Stock: ${product.stock}${compatibilityPrompt}`
+        }
             ],
             max_tokens: 2000,
             temperature: 0.7
@@ -335,16 +419,22 @@ Stock: ${product.stock}`
         }
 
         // Update product with processed data
+        const updateData: any = {
+          translated_title: processedData.translated_title,
+          bullet_points: processedData.bullet_points,
+          articulo: processedData.articulo || null,
+          marca: processedData.marca || null,
+          modelo: processedData.modelo || null
+        }
+
+        // Only update año_desde if there's NO compatibility data from CSV
+        if (productCompatibility.length === 0 && processedData.año_desde) {
+          updateData.año_desde = processedData.año_desde
+        }
+
         const { error: updateError } = await supabaseClient
           .from('vauner_products')
-          .update({
-            translated_title: processedData.translated_title,
-            bullet_points: processedData.bullet_points,
-            articulo: processedData.articulo || null,
-            marca: processedData.marca || null,
-            modelo: processedData.modelo || null,
-            año_desde: processedData.año_desde || null
-          })
+          .update(updateData)
           .eq('id', product.id)
 
         if (updateError) {

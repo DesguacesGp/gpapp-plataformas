@@ -331,6 +331,7 @@ export type Database = {
           articulo: string | null
           bullet_points: string[] | null
           category: string | null
+          compatibility_image_url: string | null
           created_at: string
           description: string
           has_image: boolean
@@ -351,6 +352,7 @@ export type Database = {
           articulo?: string | null
           bullet_points?: string[] | null
           category?: string | null
+          compatibility_image_url?: string | null
           created_at?: string
           description: string
           has_image?: boolean
@@ -371,6 +373,7 @@ export type Database = {
           articulo?: string | null
           bullet_points?: string[] | null
           category?: string | null
+          compatibility_image_url?: string | null
           created_at?: string
           description?: string
           has_image?: boolean
