@@ -142,83 +142,97 @@ Deno.serve(async (req) => {
       startHeartbeat(supabaseClient, queueId)
     }
 
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')
-    if (!OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY not configured in Supabase secrets')
-    }
-    console.log('OpenAI API Key configured:', OPENAI_API_KEY ? 'Yes (length: ' + OPENAI_API_KEY.length + ')' : 'No')
+    // Return immediate response
+    const response = new Response(
+      JSON.stringify({
+        success: true,
+        message: `Procesamiento iniciado en segundo plano. Se están reprocesando ${productsToProcess?.length || 0} productos con OEM.`,
+        batch_size: productsToProcess?.length || 0,
+        queue_id: queueId
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
 
-    // Get products to process
-    const { data: products, error: fetchError } = await supabaseClient
-      .from('vauner_products')
-      .select('*')
-      .in('id', productsToProcess)
-
-    if (fetchError) throw fetchError
-
-    // Load vehicle compatibility data from CSV
-    const { data: compatibilityData } = await supabaseClient
-      .from('vehicle_compatibility')
-      .select('*')
-      .in('vauner_sku', products?.map(p => p.sku) || [])
-
-    // Create a map for quick lookup
-    const compatibilityMap = new Map()
-    compatibilityData?.forEach(compat => {
-      if (!compatibilityMap.has(compat.vauner_sku)) {
-        compatibilityMap.set(compat.vauner_sku, [])
-      }
-      compatibilityMap.get(compat.vauner_sku).push(compat)
-    })
-
-    console.log(`Loaded compatibility data for ${compatibilityMap.size} products`)
-
-    const processedCount = { success: 0, failed: 0 }
-
-    // Process products one by one to avoid rate limits
-    for (const product of products) {
+    // Define the background processing function
+    const processInBackground = async () => {
       try {
-        console.log(`Processing product: ${product.sku}`)
+        const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')
+        if (!OPENAI_API_KEY) {
+          throw new Error('OPENAI_API_KEY not configured in Supabase secrets')
+        }
+        console.log('OpenAI API Key configured:', OPENAI_API_KEY ? 'Yes (length: ' + OPENAI_API_KEY.length + ')' : 'No')
 
-        // Get compatibility info for this product
-        const productCompatibility = compatibilityMap.get(product.sku) || []
+        // Get products to process
+        const { data: products, error: fetchError } = await supabaseClient
+          .from('vauner_products')
+          .select('*')
+          .in('id', productsToProcess)
 
-        // Prepare compatibility information for prompt
-        let compatibilityPrompt = ''
-        if (productCompatibility.length > 0) {
-          // Sort by created_at to identify principal model (first one)
-          const sortedCompat = [...productCompatibility].sort((a, b) => 
-            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-          )
-          
-          const principalModel = sortedCompat[0]
-          const secondaryModels = sortedCompat.slice(1)
-          
-          // Format all models with years for title
-          const allModelsForTitle = sortedCompat.map(c => 
-            c.año_hasta 
-              ? `${c.modelo} (${c.año_desde}-${c.año_hasta})`
-              : `${c.modelo} (${c.año_desde})`
-          ).join(' y ')
-          
-          // Get unique OEM references
-          const allOemRefs = [...new Set(
-            sortedCompat.map(c => c.referencia_oem).filter(Boolean)
-          )].join(', ')
-          
-          // Get unique equivalent references
-          const equivalentRefs = []
-          const alkarRefs = [...new Set(sortedCompat.map(c => c.referencia_alkar).filter(Boolean))]
-          const jumasaRefs = [...new Set(sortedCompat.map(c => c.referencia_jumasa).filter(Boolean))]
-          const geimexRefs = [...new Set(sortedCompat.map(c => c.referencia_geimex).filter(Boolean))]
-          
-          if (alkarRefs.length > 0) equivalentRefs.push(...alkarRefs.map(r => `ALKAR ${r}`))
-          if (jumasaRefs.length > 0) equivalentRefs.push(...jumasaRefs.map(r => `JUMASA ${r}`))
-          if (geimexRefs.length > 0) equivalentRefs.push(...geimexRefs.map(r => `GEIMEX ${r}`))
-          
-          const allEquivalentRefs = equivalentRefs.join(', ')
-          
-          compatibilityPrompt = `
+        if (fetchError) throw fetchError
+
+        // Load vehicle compatibility data from CSV
+        const { data: compatibilityData } = await supabaseClient
+          .from('vehicle_compatibility')
+          .select('*')
+          .in('vauner_sku', products?.map(p => p.sku) || [])
+
+        // Create a map for quick lookup
+        const compatibilityMap = new Map()
+        compatibilityData?.forEach(compat => {
+          if (!compatibilityMap.has(compat.vauner_sku)) {
+            compatibilityMap.set(compat.vauner_sku, [])
+          }
+          compatibilityMap.get(compat.vauner_sku).push(compat)
+        })
+
+        console.log(`Loaded compatibility data for ${compatibilityMap.size} products`)
+
+        const processedCount = { success: 0, failed: 0 }
+
+        // Process products one by one to avoid rate limits
+        for (const product of products) {
+          try {
+            console.log(`Processing product: ${product.sku}`)
+
+            // Get compatibility info for this product
+            const productCompatibility = compatibilityMap.get(product.sku) || []
+
+            // Prepare compatibility information for prompt
+            let compatibilityPrompt = ''
+            if (productCompatibility.length > 0) {
+              // Sort by created_at to identify principal model (first one)
+              const sortedCompat = [...productCompatibility].sort((a, b) => 
+                new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+              )
+              
+              const principalModel = sortedCompat[0]
+              const secondaryModels = sortedCompat.slice(1)
+              
+              // Format all models with years for title
+              const allModelsForTitle = sortedCompat.map(c => 
+                c.año_hasta 
+                  ? `${c.modelo} (${c.año_desde}-${c.año_hasta})`
+                  : `${c.modelo} (${c.año_desde})`
+              ).join(' y ')
+              
+              // Get unique OEM references
+              const allOemRefs = [...new Set(
+                sortedCompat.map(c => c.referencia_oem).filter(Boolean)
+              )].join(', ')
+              
+              // Get unique equivalent references
+              const equivalentRefs = []
+              const alkarRefs = [...new Set(sortedCompat.map(c => c.referencia_alkar).filter(Boolean))]
+              const jumasaRefs = [...new Set(sortedCompat.map(c => c.referencia_jumasa).filter(Boolean))]
+              const geimexRefs = [...new Set(sortedCompat.map(c => c.referencia_geimex).filter(Boolean))]
+              
+              if (alkarRefs.length > 0) equivalentRefs.push(...alkarRefs.map(r => `ALKAR ${r}`))
+              if (jumasaRefs.length > 0) equivalentRefs.push(...jumasaRefs.map(r => `JUMASA ${r}`))
+              if (geimexRefs.length > 0) equivalentRefs.push(...geimexRefs.map(r => `GEIMEX ${r}`))
+              
+              const allEquivalentRefs = equivalentRefs.join(', ')
+              
+              compatibilityPrompt = `
 
 DATOS DE COMPATIBILIDAD DESDE CSV (FUENTE DE VERDAD):
 - Marca del vehículo: ${principalModel.marca}
@@ -246,48 +260,48 @@ INSTRUCCIONES CRÍTICAS PARA USAR ESTOS DATOS:
    - modelo: "${principalModel.modelo}"
    - Los campos año_desde y año_hasta NO los generes (ya se actualizarán automáticamente desde el CSV)
 `
-        }
-        
-        // Apply dictionary replacements
-        let translatedDesc = product.description
-        
-        // First, handle entries with special characters that need exact matching
-        const specialCharsEntries = Object.entries(DICTIONARY).filter(([key]) => /[\/\*\.]/.test(key))
-        const normalEntries = Object.entries(DICTIONARY).filter(([key]) => !/[\/\*\.]/.test(key))
-        
-        // Apply special character replacements first (without word boundaries)
-        for (const [key, value] of specialCharsEntries) {
-          const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-          const regex = new RegExp(escapedKey, 'gi')
-          translatedDesc = translatedDesc.replace(regex, value)
-        }
-        
-        // Then apply normal replacements with word boundaries
-        for (const [key, value] of normalEntries) {
-          const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-          const regex = new RegExp(`\\b${escapedKey}\\b`, 'gi')
-          translatedDesc = translatedDesc.replace(regex, value)
-        }
+            }
+            
+            // Apply dictionary replacements
+            let translatedDesc = product.description
+            
+            // First, handle entries with special characters that need exact matching
+            const specialCharsEntries = Object.entries(DICTIONARY).filter(([key]) => /[\/\*\.]/.test(key))
+            const normalEntries = Object.entries(DICTIONARY).filter(([key]) => !/[\/\*\.]/.test(key))
+            
+            // Apply special character replacements first (without word boundaries)
+            for (const [key, value] of specialCharsEntries) {
+              const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+              const regex = new RegExp(escapedKey, 'gi')
+              translatedDesc = translatedDesc.replace(regex, value)
+            }
+            
+            // Then apply normal replacements with word boundaries
+            for (const [key, value] of normalEntries) {
+              const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+              const regex = new RegExp(`\\b${escapedKey}\\b`, 'gi')
+              translatedDesc = translatedDesc.replace(regex, value)
+            }
 
-        // Retry logic for rate limits
-        let aiResponse
-        let retries = 0
-        const maxRetries = 3
-        
-        while (retries <= maxRetries) {
-          // Call OpenAI API with gpt-4o-mini model to process the product
-          aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${OPENAI_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              model: 'gpt-4o-mini',
-              messages: [
-              {
-                role: 'system',
-                content: `Eres un experto en traducción de productos de automoción del portugués al español y en generación de títulos SEO optimizados para Amazon y eBay.
+            // Retry logic for rate limits
+            let aiResponse
+            let retries = 0
+            const maxRetries = 3
+            
+            while (retries <= maxRetries) {
+              // Call OpenAI API with gpt-4o-mini model to process the product
+              aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${OPENAI_API_KEY}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  model: 'gpt-4o-mini',
+                  messages: [
+                  {
+                    role: 'system',
+                    content: `Eres un experto en traducción de productos de automoción del portugués al español y en generación de títulos SEO optimizados para Amazon y eBay.
 
 IMPORTANTE: Las piezas son AFTERMARKET OEM EQUIVALENTE, NO son originales de fábrica. Debes ser honesto y usar términos como "Compatible OEM", "Calidad OEM", "OEM Equivalente", "Aftermarket Premium", pero NUNCA "Original" o "Original de fábrica".
 
@@ -378,166 +392,193 @@ Responde SOLO con un JSON válido en este formato exacto:
 }
 
 NO agregues texto adicional, SOLO el JSON.`
-              },
-        {
-          role: 'user',
-          content: `Procesa este producto:
+                  },
+            {
+              role: 'user',
+              content: `Procesa este producto:
 SKU: ${product.sku}
 Descripción: ${translatedDesc}
 Categoría: ${product.category}
 Precio: ${product.price}€
 Stock: ${product.stock}${compatibilityPrompt}`
-        }
-            ],
-            max_tokens: 2000,
-            temperature: 0.7
-          }),
-          })
-
-          // Handle rate limiting with exponential backoff
-          if (aiResponse.status === 429) {
-            retries++
-            if (retries > maxRetries) {
-              console.error(`Max retries reached for ${product.sku} due to rate limiting`)
-              processedCount.failed++
-              break
             }
-            const waitTime = Math.pow(2, retries) * 5000 // 10s, 20s, 40s
-            console.log(`Rate limited for ${product.sku}, waiting ${waitTime}ms before retry ${retries}/${maxRetries}`)
-            await new Promise(resolve => setTimeout(resolve, waitTime))
-            continue
+                ],
+                max_tokens: 2000,
+                temperature: 0.7
+              }),
+              })
+
+              // Handle rate limiting with exponential backoff
+              if (aiResponse.status === 429) {
+                retries++
+                if (retries > maxRetries) {
+                  console.error(`Rate limited for ${product.sku} after ${maxRetries} retries`)
+                  throw new Error('Rate limit exceeded')
+                }
+                const waitTime = Math.pow(2, retries) * 1000
+                console.log(`Rate limited. Waiting ${waitTime}ms before retry ${retries}/${maxRetries}...`)
+                await new Promise(resolve => setTimeout(resolve, waitTime))
+                continue
+              }
+
+              // Handle internal server errors
+              if (aiResponse.status === 500) {
+                const errorText = await aiResponse.text()
+                console.error(`AI API error for ${product.sku}: ${aiResponse.status} ${errorText}`)
+                throw new Error(`OpenAI API internal error: ${errorText}`)
+              }
+
+              // If successful, break retry loop
+              if (aiResponse.ok) {
+                break
+              }
+
+              // For other errors, throw immediately
+              const errorText = await aiResponse.text()
+              throw new Error(`OpenAI API error ${aiResponse.status}: ${errorText}`)
+            }
+
+            if (!aiResponse || !aiResponse.ok) {
+              throw new Error('Failed to get valid response from AI')
+            }
+
+            const aiData = await aiResponse.json()
+            
+            // Log token usage for monitoring
+            if (aiData.usage) {
+              console.log(`AI Response for ${product.sku} - Tokens used:`, {
+                prompt: aiData.usage.prompt_tokens,
+                completion: aiData.usage.completion_tokens,
+                reasoning: aiData.usage.completion_tokens_details?.reasoning_tokens || 0,
+                total: aiData.usage.total_tokens
+              })
+            }
+
+            const content = aiData.choices[0].message.content
+
+            // Parse JSON response
+            let processedData
+            try {
+              processedData = JSON.parse(content)
+            } catch (parseError) {
+              console.error(`Failed to parse AI response for ${product.sku}:`, content)
+              throw new Error('Failed to parse AI response as JSON')
+            }
+
+            // Update product with processed data
+            const updateData: any = {
+              translated_title: processedData.translated_title,
+              bullet_points: processedData.bullet_points,
+              articulo: processedData.articulo || null,
+              marca: processedData.marca || null,
+              modelo: processedData.modelo || null
+            }
+
+            // Only update año_desde if there's NO compatibility data from CSV
+            if (productCompatibility.length === 0 && processedData.año_desde) {
+              updateData.año_desde = processedData.año_desde
+            }
+
+            const { error: updateError } = await supabaseClient
+              .from('vauner_products')
+              .update(updateData)
+              .eq('id', product.id)
+
+            if (updateError) {
+              console.error(`Failed to update product ${product.sku}:`, updateError)
+              processedCount.failed++
+            } else {
+              console.log(`Successfully processed ${product.sku}`)
+              processedCount.success++
+            }
+
+            // Reduced delay to 1500ms for faster processing (still respects rate limits)
+            await new Promise(resolve => setTimeout(resolve, 1500))
+
+          } catch (error) {
+            console.error(`Error processing product ${product.sku}:`, error)
+            processedCount.failed++
           }
-
-          // If success or other error, break the retry loop
-          break
         }
 
-        if (!aiResponse || !aiResponse.ok) {
-          const errorText = aiResponse ? await aiResponse.text() : 'No response'
-          console.error(`AI API error for ${product.sku}:`, aiResponse?.status, errorText)
-          processedCount.failed++
-          continue
-        }
-
-        const aiData = await aiResponse.json()
-        console.log(`AI Response for ${product.sku} - Tokens used:`, {
-          prompt: aiData.usage?.prompt_tokens,
-          completion: aiData.usage?.completion_tokens,
-          reasoning: aiData.usage?.completion_tokens_details?.reasoning_tokens,
-          total: aiData.usage?.total_tokens
-        })
-        
-        const content = aiData.choices?.[0]?.message?.content
-
-        if (!content) {
-          console.error(`No content from AI for ${product.sku}. Finish reason:`, aiData.choices?.[0]?.finish_reason)
-          console.error(`Full AI response:`, JSON.stringify(aiData))
-          processedCount.failed++
-          continue
-        }
-
-        // Parse JSON response
-        let processedData
-        try {
-          // Remove markdown code blocks if present
-          const cleanedContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-          processedData = JSON.parse(cleanedContent)
-        } catch (parseError) {
-          console.error(`Failed to parse AI response for ${product.sku}:`, content)
-          processedCount.failed++
-          continue
-        }
-
-        // Update product with processed data
-        const updateData: any = {
-          translated_title: processedData.translated_title,
-          bullet_points: processedData.bullet_points,
-          articulo: processedData.articulo || null,
-          marca: processedData.marca || null,
-          modelo: processedData.modelo || null
-        }
-
-        // Only update año_desde if there's NO compatibility data from CSV
-        if (productCompatibility.length === 0 && processedData.año_desde) {
-          updateData.año_desde = processedData.año_desde
-        }
-
-        const { error: updateError } = await supabaseClient
+        // Update queue status and check if there are more products to process
+        // Build same query to check remaining
+        let remainingQuery = supabaseClient
           .from('vauner_products')
-          .update(updateData)
-          .eq('id', product.id)
+          .select('*', { count: 'exact', head: true })
+          .in('sku', oemSkuList)
+        
+        if (!forceReprocess) {
+          remainingQuery = remainingQuery.is('translated_title', null)
+        }
+        
+        const { count: remainingCount } = await remainingQuery
+        
+        console.log(`✅ Batch complete. Processed: ${processedCount.success}, Failed: ${processedCount.failed}, Remaining: ${remainingCount || 0}`)
+        if (forceReprocess) {
+          console.log(`🔄 Force reprocess completed for this batch`)
+        }
+        
+        // Stop heartbeat
+        stopHeartbeat()
+        
+        // Update current queue entry
+        if (queueId) {
+          await supabaseClient
+            .from('processing_queue')
+            .update({ 
+              status: 'completed',
+              processed_count: processedCount.success,
+              completed_at: new Date().toISOString()
+            })
+            .eq('id', queueId)
+        }
+        
+        // If there are more products, create a new queue entry (cron will pick it up)
+        if (remainingCount && remainingCount > 0) {
+          console.log('More products remaining, creating new queue entry...')
+          
+          const { data: newQueue } = await supabaseClient
+            .from('processing_queue')
+            .insert({
+              status: 'pending',
+              batch_size: 50,
+              total_count: remainingCount
+            })
+            .select()
+            .single()
 
-        if (updateError) {
-          console.error(`Failed to update product ${product.sku}:`, updateError)
-          processedCount.failed++
+          if (newQueue) {
+            console.log(`✅ Created new queue entry: ${newQueue.id} - The cron job will pick it up automatically in max 2 minutes`)
+          }
         } else {
-          console.log(`Successfully processed ${product.sku}`)
-          processedCount.success++
+          console.log('✅ All products processed!')
         }
 
-        // Reduced delay to 1500ms for faster processing (still respects rate limits)
-        await new Promise(resolve => setTimeout(resolve, 1500))
-
-      } catch (error) {
-        console.error(`Error processing product ${product.sku}:`, error)
-        processedCount.failed++
+      } catch (bgError) {
+        console.error('❌ Error in background processing:', bgError)
+        
+        // Stop heartbeat on error
+        stopHeartbeat()
+        
+        if (queueId) {
+          await supabaseClient
+            .from('processing_queue')
+            .update({ 
+              status: 'failed',
+              error_message: bgError instanceof Error ? bgError.message : 'Unknown error',
+              completed_at: new Date().toISOString()
+            })
+            .eq('id', queueId)
+        }
       }
     }
 
-    // Update queue status and check if there are more products to process
-    const { count: remainingCount } = await supabaseClient
-      .from('vauner_products')
-      .select('*', { count: 'exact', head: true })
-      .is('translated_title', null)
-    
-    console.log(`Batch complete. Processed: ${processedCount.success}, Failed: ${processedCount.failed}, Remaining: ${remainingCount || 0}`)
-    
-    // Stop heartbeat
-    stopHeartbeat()
-    
-    // Update current queue entry
-    if (queueId) {
-      await supabaseClient
-        .from('processing_queue')
-        .update({ 
-          status: 'completed',
-          processed_count: processedCount.success,
-          completed_at: new Date().toISOString()
-        })
-        .eq('id', queueId)
-    }
-    
-    // If there are more products, create a new queue entry (cron will pick it up)
-    if (remainingCount && remainingCount > 0) {
-      console.log('More products remaining, creating new queue entry...')
-      
-      const { data: newQueue } = await supabaseClient
-        .from('processing_queue')
-        .insert({
-          status: 'pending',
-          batch_size: 50,
-          total_count: remainingCount
-        })
-        .select()
-        .single()
+    // Start background processing (no await)
+    processInBackground().catch(err => console.error('Background process error:', err))
 
-      if (newQueue) {
-        console.log(`✅ Created new queue entry: ${newQueue.id} - The cron job will pick it up automatically in max 2 minutes`)
-      }
-    } else {
-      console.log('✅ All products processed!')
-    }
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: `Procesados ${processedCount.success} productos correctamente, ${processedCount.failed} fallidos. ${remainingCount || 0} pendientes.`,
-        processed: processedCount.success,
-        failed: processedCount.failed,
-        remaining: remainingCount || 0
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    // Return immediate response
+    return response
 
   } catch (error) {
     console.error('❌ Error in process-products:', error)
