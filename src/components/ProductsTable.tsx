@@ -129,7 +129,7 @@ export const ProductsTable = ({
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [localSearch, onSearchChange]);
+  }, [localSearch]);
 
   const SortButton = ({ field, children }: { field: string; children: React.ReactNode }) => {
     const isActive = sortField === field || (field === "ai_processed" && sortField === "ai_processed");
