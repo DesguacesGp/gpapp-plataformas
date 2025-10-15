@@ -54,28 +54,40 @@ Deno.serve(async (req) => {
     
     console.log(`📐 Original dimensions: ${image.width}x${image.height}`)
 
-    // Step 3: Resize maintaining aspect ratio (max 1000px on longest side)
-    let newWidth = image.width
-    let newHeight = image.height
-    const maxSize = 1000
-
-    if (newWidth > maxSize || newHeight > maxSize) {
-      if (newWidth > newHeight) {
-        newHeight = Math.round((newHeight * maxSize) / newWidth)
-        newWidth = maxSize
+    // Step 3: Create 1000x1000 canvas and scale image to 85%
+    const canvasSize = 1000
+    const imageSize = Math.round(canvasSize * 0.85) // 850px
+    
+    // Scale image to fit within 850x850 maintaining aspect ratio
+    let scaledWidth = image.width
+    let scaledHeight = image.height
+    
+    if (scaledWidth > imageSize || scaledHeight > imageSize) {
+      if (scaledWidth > scaledHeight) {
+        scaledHeight = Math.round((scaledHeight * imageSize) / scaledWidth)
+        scaledWidth = imageSize
       } else {
-        newWidth = Math.round((newWidth * maxSize) / newHeight)
-        newHeight = maxSize
+        scaledWidth = Math.round((scaledWidth * imageSize) / scaledHeight)
+        scaledHeight = imageSize
       }
-      
-      console.log(`🔄 Resizing to: ${newWidth}x${newHeight}`)
-      image.resize(newWidth, newHeight)
-    } else {
-      console.log(`✓ No resize needed (already under 1000px)`)
     }
+    
+    console.log(`🔄 Scaling product to: ${scaledWidth}x${scaledHeight}`)
+    image.resize(scaledWidth, scaledHeight)
+    
+    // Create white 1000x1000 canvas
+    const canvas = new Image(canvasSize, canvasSize)
+    canvas.fill(0xFFFFFFFF) // White background
+    
+    // Center the scaled image on the canvas
+    const offsetX = Math.round((canvasSize - scaledWidth) / 2)
+    const offsetY = Math.round((canvasSize - scaledHeight) / 2)
+    
+    console.log(`📍 Positioning at: (${offsetX}, ${offsetY})`)
+    canvas.composite(image, offsetX, offsetY)
 
     // Step 4: Convert to JPEG with 90% quality
-    const jpegBuffer = await image.encodeJPEG(90)
+    const jpegBuffer = await canvas.encodeJPEG(90)
     console.log(`✅ Converted to JPEG: ${jpegBuffer.byteLength} bytes`)
 
     // Step 5: Upload to Supabase Storage
@@ -110,7 +122,7 @@ Deno.serve(async (req) => {
         success: true, 
         url: publicUrl,
         sku: sku,
-        dimensions: { width: newWidth, height: newHeight }
+        dimensions: { width: canvasSize, height: canvasSize }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
