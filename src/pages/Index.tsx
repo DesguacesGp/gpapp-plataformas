@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -472,22 +472,22 @@ const Index = () => {
     }
   }, [isCheckingAuth, currentPage, searchTerm, categoryFilter, articuloFilter, sortField, sortDirection]);
 
-  const handleSearchChange = (search: string) => {
+  const handleSearchChange = useCallback((search: string) => {
     setSearchTerm(search);
     setCurrentPage(1); // Reset to first page on search
-  };
+  }, []);
 
-  const handleCategoryChange = (category: string) => {
+  const handleCategoryChange = useCallback((category: string) => {
     setCategoryFilter(category);
     setCurrentPage(1); // Reset to first page on filter change
-  };
+  }, []);
 
-  const handleArticuloChange = (articulo: string) => {
+  const handleArticuloChange = useCallback((articulo: string) => {
     setArticuloFilter(articulo);
     setCurrentPage(1); // Reset to first page on filter change
-  };
+  }, []);
 
-  const handleSortChange = (field: string) => {
+  const handleSortChange = useCallback((field: string) => {
     if (sortField === field) {
       // Toggle direction if same field
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
@@ -497,7 +497,7 @@ const Index = () => {
       setSortDirection("asc");
     }
     setCurrentPage(1); // Reset to first page on sort change
-  };
+  }, [sortField, sortDirection]);
 
   const totalPages = Math.ceil(totalProducts / productsPerPage);
 
