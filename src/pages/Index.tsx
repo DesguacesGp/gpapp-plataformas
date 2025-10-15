@@ -271,17 +271,27 @@ const Index = () => {
         });
       }
 
-      // Get count of products with OEM references (UNIQUE SKUs)
-      const { data: oemProducts, error: oemError } = await supabase
+      // Get count of products IN CATALOG with OEM references
+      const { data: oemSkus, error: oemSkusError } = await supabase
         .from('vehicle_compatibility')
         .select('vauner_sku')
         .not('referencia_oem', 'is', null)
         .neq('referencia_oem', '');
 
-      if (!oemError && oemProducts) {
-        // Use Set to get unique SKUs
-        const uniqueOemSkus = [...new Set(oemProducts.map(x => x.vauner_sku))];
-        setProductsWithOem(uniqueOemSkus.length);
+      if (!oemSkusError && oemSkus) {
+        const uniqueOemSkus = [...new Set(oemSkus.map(x => x.vauner_sku))];
+        
+        // Count how many of these SKUs exist in vauner_products catalog
+        const { count: catalogOemCount, error: catalogError } = await supabase
+          .from('vauner_products')
+          .select('*', { count: 'exact', head: true })
+          .in('sku', uniqueOemSkus);
+        
+        if (!catalogError) {
+          setProductsWithOem(catalogOemCount || 0);
+        } else {
+          setProductsWithOem(0);
+        }
       } else {
         setProductsWithOem(0);
       }

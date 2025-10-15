@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
     const { productIds, queueId, forceReprocess = false } = await req.json()
     console.log(`Processing batch - QueueId: ${queueId}, ForceReprocess: ${forceReprocess}`)
     
-    // CRITICAL: Get SKUs with OEM references first
+    // CRITICAL: Get SKUs with OEM references from vehicle_compatibility
     const { data: skusWithOem, error: oemError } = await supabaseClient
       .from('vehicle_compatibility')
       .select('vauner_sku')
@@ -100,16 +100,17 @@ Deno.serve(async (req) => {
     }
 
     const oemSkuList = [...new Set(skusWithOem?.map(x => x.vauner_sku) || [])]
-    console.log(`📋 Found ${oemSkuList.length} unique SKUs with OEM references (from ${skusWithOem?.length || 0} total compatibility rows)`)
+    console.log(`📋 Found ${oemSkuList.length} unique SKUs with OEM in compatibility table`)
 
-    // Get next batch of products (filtered by OEM)
+    // Get next batch of products FROM CATALOG (vauner_products) filtered by OEM
     let productsToProcess = productIds
     if (!productsToProcess && queueId) {
-      // Build query for next batch filtered by OEM SKUs
+      // Build query: select from catalog, only products that have OEM in compatibility
       let query = supabaseClient
         .from('vauner_products')
         .select('id')
         .in('sku', oemSkuList)
+        .order('created_at', { ascending: true })
         .limit(50)
       
       // If NOT force reprocess, filter only products without translated_title
@@ -120,9 +121,9 @@ Deno.serve(async (req) => {
       const { data: nextBatch } = await query
       
       productsToProcess = nextBatch?.map(p => p.id) || []
-      console.log(`📦 Processing batch of ${productsToProcess.length} products with OEM references`)
+      console.log(`📦 Processing batch of ${productsToProcess.length} products from catalog with OEM`)
       if (forceReprocess) {
-        console.log(`🔄 FORCE REPROCESS MODE - Updating existing titles/bullets`)
+        console.log(`🔄 FORCE REPROCESS MODE - Will update all ${oemSkuList.length} catalog products with OEM`)
       }
     }
     
