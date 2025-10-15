@@ -149,7 +149,7 @@ CRÍTICO: La tabla debe ser perfectamente legible y profesional, apta para usar 
     const base64Data = imageUrl.split(',')[1]
     const buffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0))
     
-    const fileName = `compatibility-tables/${product.sku}-${Date.now()}.jpg`
+    const fileName = `compatibility-tables/${product.sku}-compatible.jpg`
     
     const { error: uploadError } = await supabaseClient
       .storage

@@ -35,6 +35,7 @@ interface Product {
   año_hasta: string | null;
   raw_data?: any;
   processed_image_url?: string | null;
+  compatibility_image_url?: string | null;
   compatibility?: {
     marca: string;
     modelo: string;
@@ -336,6 +337,9 @@ export const ProductsTable = ({
               <TableHead className="text-center">
                 <SortButton field="has_image">Imagen</SortButton>
               </TableHead>
+              <TableHead className="text-center">
+                Imagen 2
+              </TableHead>
               <TableHead className="w-24">
                 <SortButton field="category">Categoría</SortButton>
               </TableHead>
@@ -344,7 +348,7 @@ export const ProductsTable = ({
           <TableBody>
             {products.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={17} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={18} className="text-center py-8 text-muted-foreground">
                   No hay productos que mostrar
                 </TableCell>
               </TableRow>
@@ -557,6 +561,28 @@ export const ProductsTable = ({
                       )
                     ) : (
                       <Badge variant="secondary">No</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {product.compatibility && product.compatibility.length > 0 ? (
+                      product.compatibility_image_url ? (
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Check className="h-4 w-4 text-green-500 mx-auto cursor-pointer" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <img 
+                              src={product.compatibility_image_url} 
+                              alt="Tabla de compatibilidad" 
+                              className="w-64 h-64 object-contain"
+                            />
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <Clock className="h-4 w-4 text-yellow-500 mx-auto" />
+                      )
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
                     )}
                   </TableCell>
                   <TableCell>
