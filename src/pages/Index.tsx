@@ -198,16 +198,19 @@ const Index = () => {
 
       setProducts(productsWithFinalPrice);
 
-      // Get image stats
-      const { data: allProducts } = await supabase
-        .from('vauner_products')
-        .select('processed_image_url, raw_data');
+      // Get image stats using optimized database function
+      const { data: statsData, error: statsError } = await supabase
+        .rpc('get_image_statistics');
       
-      if (allProducts) {
-        const processed = allProducts.filter(p => p.processed_image_url).length;
-        const pending = allProducts.filter(p => !p.processed_image_url && (p.raw_data as any)?.image).length;
-        const none = allProducts.filter(p => !(p.raw_data as any)?.image).length;
-        setImageStats({ processed, pending, none });
+      if (statsError) {
+        console.error('Error loading image stats:', statsError);
+      } else if (statsData && statsData.length > 0) {
+        const stats = statsData[0];
+        setImageStats({
+          processed: Number(stats.processed_count),
+          pending: Number(stats.pending_count),
+          none: Number(stats.none_count)
+        });
       }
     } catch (error: any) {
       console.error('Error loading products:', error);
