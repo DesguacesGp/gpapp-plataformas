@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
       return {
         marca: c.marca,
         modelo: c.modelo,
-        años: `${c.año_desde}-${c.año_hasta || 'actual'}`,
+        años: c.año_hasta ? `${c.año_desde}-${c.año_hasta}` : c.año_desde,
         referencias: refs.join(' | ') || 'N/A'
       }
     })

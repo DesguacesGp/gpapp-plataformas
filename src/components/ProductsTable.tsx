@@ -340,6 +340,9 @@ export const ProductsTable = ({
               <TableHead className="text-center">
                 Imagen 2
               </TableHead>
+              <TableHead className="text-center">
+                Imagen 3
+              </TableHead>
               <TableHead className="w-24">
                 <SortButton field="category">Categoría</SortButton>
               </TableHead>
@@ -348,7 +351,7 @@ export const ProductsTable = ({
           <TableBody>
             {products.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={18} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={19} className="text-center py-8 text-muted-foreground">
                   No hay productos que mostrar
                 </TableCell>
               </TableRow>
@@ -418,7 +421,7 @@ export const ProductsTable = ({
                                       {comp.referencia_oem.split(';').join(', ')}
                                     </p>
                                     <p className="text-muted-foreground text-[10px]">
-                                      {comp.marca} {comp.modelo} ({comp.año_desde}-{comp.año_hasta || 'actual'})
+                                      {comp.marca} {comp.modelo} ({comp.año_desde}{comp.año_hasta ? `-${comp.año_hasta}` : ''})
                                     </p>
                                   </div>
                                 )
@@ -476,7 +479,7 @@ export const ProductsTable = ({
                                     <p><span className="font-semibold">GEIMEX:</span> <span className="font-mono text-[10px]">{comp.referencia_geimex}</span></p>
                                   )}
                                   <p className="text-muted-foreground text-[10px]">
-                                    {comp.marca} {comp.modelo} ({comp.año_desde}-{comp.año_hasta || 'actual'})
+                                    {comp.marca} {comp.modelo} ({comp.año_desde}{comp.año_hasta ? `-${comp.año_hasta}` : ''})
                                   </p>
                                 </div>
                               ))}
@@ -566,24 +569,30 @@ export const ProductsTable = ({
                   <TableCell className="text-center">
                     {product.compatibility && product.compatibility.length > 0 ? (
                       product.compatibility_image_url ? (
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <Check className="h-4 w-4 text-green-500 mx-auto cursor-pointer" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <img 
-                              src={product.compatibility_image_url} 
-                              alt="Tabla de compatibilidad" 
-                              className="w-64 h-64 object-contain"
-                            />
-                          </TooltipContent>
-                        </Tooltip>
+                        <a 
+                          href={product.compatibility_image_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-600 hover:underline"
+                        >
+                          Ver imagen
+                        </a>
                       ) : (
-                        <Clock className="h-4 w-4 text-yellow-500 mx-auto" />
+                        <span className="text-xs text-yellow-600">⏳ Pendiente</span>
                       )
                     ) : (
                       <span className="text-muted-foreground">-</span>
                     )}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <a
+                      href="/images/recambify-branding.png"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      Ver imagen
+                    </a>
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="text-xs truncate max-w-[100px]">{product.category || "Sin categoría"}</Badge>

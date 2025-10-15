@@ -171,7 +171,9 @@ Deno.serve(async (req) => {
           
           // Format all models with years for title
           const allModelsForTitle = sortedCompat.map(c => 
-            `${c.modelo} (${c.año_desde}-${c.año_hasta || 'actual'})`
+            c.año_hasta 
+              ? `${c.modelo} (${c.año_desde}-${c.año_hasta})`
+              : `${c.modelo} (${c.año_desde})`
           ).join(' y ')
           
           // Get unique OEM references
@@ -195,8 +197,8 @@ Deno.serve(async (req) => {
 
 DATOS DE COMPATIBILIDAD DESDE CSV (FUENTE DE VERDAD):
 - Marca del vehículo: ${principalModel.marca}
-- Modelo PRINCIPAL: ${principalModel.modelo} (${principalModel.año_desde}-${principalModel.año_hasta || 'actual'})
-${secondaryModels.length > 0 ? `- Modelos SECUNDARIOS: ${secondaryModels.map(m => `${m.modelo} (${m.año_desde}-${m.año_hasta || 'actual'})`).join(', ')}` : ''}
+- Modelo PRINCIPAL: ${principalModel.modelo} (${principalModel.año_desde}${principalModel.año_hasta ? `-${principalModel.año_hasta}` : ''})
+${secondaryModels.length > 0 ? `- Modelos SECUNDARIOS: ${secondaryModels.map(m => m.año_hasta ? `${m.modelo} (${m.año_desde}-${m.año_hasta})` : `${m.modelo} (${m.año_desde})`).join(', ')}` : ''}
 - Referencias OEM: ${allOemRefs || 'No disponibles'}
 - Referencias equivalentes: ${allEquivalentRefs || 'No disponibles'}
 
