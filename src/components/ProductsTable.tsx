@@ -75,6 +75,11 @@ export const ProductsTable = ({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [localSearch, setLocalSearch] = useState(searchTerm);
 
+  // Sync localSearch with searchTerm prop
+  useEffect(() => {
+    setLocalSearch(searchTerm);
+  }, [searchTerm]);
+
   // Get enabled categories and articulos from database
   const [categories, setCategories] = useState<string[]>([]);
   const [articulos, setArticulos] = useState<string[]>([]);
