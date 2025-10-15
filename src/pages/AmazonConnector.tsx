@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AmazonProductsTable } from "@/components/AmazonProductsTable";
 import * as XLSX from 'xlsx';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface AmazonProduct {
   id: string;
@@ -23,6 +25,7 @@ interface AmazonProduct {
   modelo: string | null;
   año_desde: string | null;
   año_hasta: string | null;
+  raw_data?: any;
   amazon_config?: {
     feed_product_type: string;
     recommended_browse_node: string;
@@ -155,6 +158,7 @@ const AmazonConnector = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalProducts, setTotalProducts] = useState(0);
   const PRODUCTS_PER_PAGE = 100;
+  const [selectedRawData, setSelectedRawData] = useState<any>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -800,6 +804,33 @@ const AmazonConnector = () => {
                   <Download className="mr-2 h-4 w-4" />
                   Exportar Amazon Flat File
                 </Button>
+                
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button 
+                      variant="outline"
+                      onClick={() => {
+                        const firstProduct = products[0];
+                        if (firstProduct) {
+                          setSelectedRawData(firstProduct.raw_data);
+                        }
+                      }}
+                      disabled={products.length === 0}
+                    >
+                      Ver Dato Bruto
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-4xl max-h-[80vh]">
+                    <DialogHeader>
+                      <DialogTitle>Dato Bruto de la API (Primer Producto)</DialogTitle>
+                    </DialogHeader>
+                    <ScrollArea className="h-[60vh] w-full">
+                      <pre className="text-xs p-4 bg-muted rounded-lg">
+                        {JSON.stringify(selectedRawData, null, 2)}
+                      </pre>
+                    </ScrollArea>
+                  </DialogContent>
+                </Dialog>
               </div>
             </div>
           </CardHeader>
