@@ -316,6 +316,8 @@ export const ProductsTable = ({
               <TableHead className="w-24">
                 <SortButton field="modelo">Modelo</SortButton>
               </TableHead>
+              <TableHead className="w-20 text-center">Año Desde</TableHead>
+              <TableHead className="w-20 text-center">Año Hasta</TableHead>
               <TableHead className="w-32">Ref OEM</TableHead>
               <TableHead className="w-32">Ref Equiv.</TableHead>
               <TableHead className="w-20 text-center">
@@ -342,7 +344,7 @@ export const ProductsTable = ({
           <TableBody>
             {products.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={15} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={17} className="text-center py-8 text-muted-foreground">
                   No hay productos que mostrar
                 </TableCell>
               </TableRow>
@@ -357,31 +359,27 @@ export const ProductsTable = ({
                   </TableCell>
                   <TableCell className="font-medium">{product.sku}</TableCell>
                   <TableCell className="text-sm truncate max-w-[130px]">{product.articulo || "-"}</TableCell>
-                  <TableCell className="text-sm">
-                    <div className="flex flex-col gap-1">
-                      <span className="font-medium">{product.marca || "-"}</span>
-                      {product.año_desde && (
-                        <div className="flex gap-1 items-center text-[10px] text-muted-foreground">
-                          <Badge variant="outline" className="px-1 py-0 font-mono">
-                            {product.año_desde}
-                          </Badge>
-                          <span>→</span>
-                          <Badge variant="outline" className="px-1 py-0 font-mono">
-                            {product.año_hasta || 'actual'}
-                          </Badge>
-                        </div>
-                      )}
-                    </div>
+                  <TableCell className="text-sm font-medium">
+                    {product.marca || "-"}
                   </TableCell>
                   <TableCell className="text-sm">
-                    <div className="flex items-center gap-2">
-                      <span>{product.modelo || "-"}</span>
-                      {product.compatibility && product.compatibility.length > 0 ? (
-                        <Badge variant="secondary" className="text-[9px]">CSV</Badge>
-                      ) : product.marca ? (
-                        <Badge variant="outline" className="text-[9px]">IA</Badge>
-                      ) : null}
-                    </div>
+                    {product.modelo || "-"}
+                  </TableCell>
+                  <TableCell className="text-sm text-center">
+                    {product.año_desde ? (
+                      <Badge variant="outline" className="font-mono text-[10px]">
+                        {product.año_desde}
+                      </Badge>
+                    ) : "-"}
+                  </TableCell>
+                  <TableCell className="text-sm text-center">
+                    {product.año_hasta ? (
+                      <Badge variant="outline" className="font-mono text-[10px]">
+                        {product.año_hasta}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">actual</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-xs">
                     {product.compatibility && product.compatibility.length > 0 ? (
