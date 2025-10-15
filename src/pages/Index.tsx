@@ -271,14 +271,20 @@ const Index = () => {
         });
       }
 
-      // Get count of products with OEM references
-      const { count: oemCount } = await supabase
+      // Get count of products with OEM references (UNIQUE SKUs)
+      const { data: oemProducts, error: oemError } = await supabase
         .from('vehicle_compatibility')
-        .select('vauner_sku', { count: 'exact', head: true })
+        .select('vauner_sku')
         .not('referencia_oem', 'is', null)
         .neq('referencia_oem', '');
 
-      setProductsWithOem(oemCount || 0);
+      if (!oemError && oemProducts) {
+        // Use Set to get unique SKUs
+        const uniqueOemSkus = [...new Set(oemProducts.map(x => x.vauner_sku))];
+        setProductsWithOem(uniqueOemSkus.length);
+      } else {
+        setProductsWithOem(0);
+      }
     } catch (error: any) {
       console.error('Error loading products:', error);
       toast.error('Error al cargar productos: ' + error.message);
@@ -430,7 +436,7 @@ const Index = () => {
     setIsProcessingAI(true);
     
     try {
-      toast.info('🤖 Iniciando procesamiento con IA (solo productos con Ref OEM, batches de 50)...');
+      toast.info('🤖 Iniciando reprocesamiento FORZADO de productos con OEM...');
       
       const { data: queueData, error: queueError } = await supabase
         .from('processing_queue')
@@ -446,12 +452,15 @@ const Index = () => {
       if (queueError) throw queueError;
 
       const { error: processError } = await supabase.functions.invoke('process-products', {
-        body: { queueId: queueData.id }
+        body: { 
+          queueId: queueData.id,
+          forceReprocess: true
+        }
       });
 
       if (processError) throw processError;
 
-      toast.success('✅ Procesamiento con IA iniciado (solo productos con Ref OEM). El sistema continuará automáticamente en segundo plano.');
+      toast.success('✅ Reprocesamiento iniciado. Se actualizarán todos los productos con OEM.');
       
       setTimeout(() => loadProducts(), 2000);
     } catch (error: any) {

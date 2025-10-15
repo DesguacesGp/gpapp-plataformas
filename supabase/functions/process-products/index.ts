@@ -84,7 +84,8 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { productIds, queueId } = await req.json()
+    const { productIds, queueId, forceReprocess = false } = await req.json()
+    console.log(`Processing batch - QueueId: ${queueId}, ForceReprocess: ${forceReprocess}`)
     
     // CRITICAL: Get SKUs with OEM references first
     const { data: skusWithOem, error: oemError } = await supabaseClient
@@ -99,24 +100,31 @@ Deno.serve(async (req) => {
     }
 
     const oemSkuList = [...new Set(skusWithOem?.map(x => x.vauner_sku) || [])]
-    console.log(`📋 Found ${oemSkuList.length} unique SKUs with OEM references`)
+    console.log(`📋 Found ${oemSkuList.length} unique SKUs with OEM references (from ${skusWithOem?.length || 0} total compatibility rows)`)
 
     // Get next batch of products (filtered by OEM)
     let productsToProcess = productIds
     if (!productsToProcess && queueId) {
-      // If no productIds provided, get next batch filtered by OEM SKUs
-      const { data: nextBatch } = await supabaseClient
+      // Build query for next batch filtered by OEM SKUs
+      let query = supabaseClient
         .from('vauner_products')
         .select('id')
         .in('sku', oemSkuList)
-        .is('translated_title', null)
         .limit(50)
+      
+      // If NOT force reprocess, filter only products without translated_title
+      if (!forceReprocess) {
+        query = query.is('translated_title', null)
+      }
+      
+      const { data: nextBatch } = await query
       
       productsToProcess = nextBatch?.map(p => p.id) || []
       console.log(`📦 Processing batch of ${productsToProcess.length} products with OEM references`)
+      if (forceReprocess) {
+        console.log(`🔄 FORCE REPROCESS MODE - Updating existing titles/bullets`)
+      }
     }
-    
-    console.log(`Processing batch - ProductIds: ${productsToProcess?.length}, QueueId: ${queueId}`)
     
     // If queueId provided, update queue status to processing and start heartbeat
     if (queueId) {
