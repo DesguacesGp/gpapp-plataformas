@@ -243,7 +243,9 @@ Deno.serve(async (req) => {
                 price: parseFloat(product.valor) || 0,
                 has_image: true,
                 category: categoryName,
-                raw_data: null // Don't store raw_data to reduce size
+                raw_data: {
+                  image: product.image
+                }
               }))
             
             console.log(`Found ${categoryProducts.length} products with images in category ${categoryId}`)
