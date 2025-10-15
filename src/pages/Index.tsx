@@ -203,13 +203,21 @@ const Index = () => {
         .rpc('get_image_statistics');
       
       if (statsError) {
-        console.error('Error loading image stats:', statsError);
+        console.error('❌ Error loading image stats:', statsError);
+        // Fallback to showing zeros if stats fail
+        setImageStats({ processed: 0, pending: 0, none: 0 });
       } else if (statsData && statsData.length > 0) {
         const stats = statsData[0];
         setImageStats({
           processed: Number(stats.processed_count),
           pending: Number(stats.pending_count),
           none: Number(stats.none_count)
+        });
+        console.log('📊 Image statistics loaded:', {
+          processed: stats.processed_count,
+          pending: stats.pending_count,
+          none: stats.none_count,
+          total: stats.total_count
         });
       }
     } catch (error: any) {
