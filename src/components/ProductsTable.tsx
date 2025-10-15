@@ -385,7 +385,7 @@ export const ProductsTable = ({
                         {product.año_hasta}
                       </Badge>
                     ) : (
-                      <span className="text-muted-foreground text-xs">actual</span>
+                      <span className="text-muted-foreground text-xs">-</span>
                     )}
                   </TableCell>
                   <TableCell className="text-xs">
