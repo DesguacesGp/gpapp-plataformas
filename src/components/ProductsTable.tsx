@@ -73,12 +73,6 @@ export const ProductsTable = ({
   onSortChange
 }: ProductsTableProps) => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [localSearch, setLocalSearch] = useState(searchTerm);
-
-  // Sync localSearch with searchTerm prop
-  useEffect(() => {
-    setLocalSearch(searchTerm);
-  }, [searchTerm]);
 
   // Get enabled categories and articulos from database
   const [categories, setCategories] = useState<string[]>([]);
@@ -126,15 +120,6 @@ export const ProductsTable = ({
     loadCategories();
     loadArticulos();
   }, []);
-
-  // Debounce search
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      onSearchChange(localSearch);
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [localSearch]);
 
   const SortButton = ({ field, children }: { field: string; children: React.ReactNode }) => {
     const isActive = sortField === field || (field === "ai_processed" && sortField === "ai_processed");
@@ -272,8 +257,8 @@ export const ProductsTable = ({
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
             placeholder="Buscar por SKU o descripción..."
-            value={localSearch}
-            onChange={(e) => setLocalSearch(e.target.value)}
+            value={searchTerm}
+            onChange={(e) => onSearchChange(e.target.value)}
             className="pl-10"
           />
         </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -48,6 +48,9 @@ const Index = () => {
   const [sortField, setSortField] = useState<string>("ai_processed");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const productsPerPage = 20;
+  
+  // Ref for search debounce
+  const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
   // Check authentication
   useEffect(() => {
@@ -473,8 +476,16 @@ const Index = () => {
   }, [isCheckingAuth, currentPage, searchTerm, categoryFilter, articuloFilter, sortField, sortDirection]);
 
   const handleSearchChange = useCallback((search: string) => {
-    setSearchTerm(search);
-    setCurrentPage(1); // Reset to first page on search
+    // Clear previous timeout
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+    
+    // Create new timeout
+    searchDebounceRef.current = setTimeout(() => {
+      setSearchTerm(search);
+      setCurrentPage(1);
+    }, 500);
   }, []);
 
   const handleCategoryChange = useCallback((category: string) => {
