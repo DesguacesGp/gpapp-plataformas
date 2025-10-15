@@ -25,6 +25,16 @@ interface Product {
   año_hasta: string | null;
   raw_data?: any;
   processed_image_url?: string | null;
+  compatibility?: {
+    marca: string;
+    modelo: string;
+    año_desde: string | null;
+    año_hasta: string | null;
+    referencia_oem: string | null;
+    referencia_alkar: string | null;
+    referencia_jumasa: string | null;
+    referencia_geimex: string | null;
+  }[];
 }
 
 const Index = () => {
@@ -198,7 +208,42 @@ const Index = () => {
         };
       });
 
-      setProducts(productsWithFinalPrice);
+      // Load compatibility data for current products
+      if (productsData && productsData.length > 0) {
+        const skus = productsData.map(p => p.sku);
+        const { data: compatData } = await supabase
+          .from('vehicle_compatibility')
+          .select('*')
+          .in('vauner_sku', skus);
+        
+        // Group compatibilities by SKU
+        const compatMap = new Map<string, any[]>();
+        compatData?.forEach(comp => {
+          if (!compatMap.has(comp.vauner_sku)) {
+            compatMap.set(comp.vauner_sku, []);
+          }
+          compatMap.get(comp.vauner_sku)!.push({
+            marca: comp.marca,
+            modelo: comp.modelo,
+            año_desde: comp.año_desde,
+            año_hasta: comp.año_hasta,
+            referencia_oem: comp.referencia_oem,
+            referencia_alkar: comp.referencia_alkar,
+            referencia_jumasa: comp.referencia_jumasa,
+            referencia_geimex: comp.referencia_geimex
+          });
+        });
+        
+        // Combine products with compatibility data
+        const productsWithCompat = productsWithFinalPrice.map(product => ({
+          ...product,
+          compatibility: compatMap.get(product.sku) || []
+        }));
+        
+        setProducts(productsWithCompat);
+      } else {
+        setProducts(productsWithFinalPrice);
+      }
 
       // Get image stats using optimized database function
       const { data: statsData, error: statsError } = await supabase

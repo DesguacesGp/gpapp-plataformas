@@ -387,6 +387,51 @@ export type Database = {
         }
         Relationships: []
       }
+      vehicle_compatibility: {
+        Row: {
+          año_desde: string | null
+          año_hasta: string | null
+          created_at: string
+          id: string
+          marca: string
+          modelo: string
+          referencia_alkar: string | null
+          referencia_geimex: string | null
+          referencia_jumasa: string | null
+          referencia_oem: string | null
+          updated_at: string
+          vauner_sku: string
+        }
+        Insert: {
+          año_desde?: string | null
+          año_hasta?: string | null
+          created_at?: string
+          id?: string
+          marca: string
+          modelo: string
+          referencia_alkar?: string | null
+          referencia_geimex?: string | null
+          referencia_jumasa?: string | null
+          referencia_oem?: string | null
+          updated_at?: string
+          vauner_sku: string
+        }
+        Update: {
+          año_desde?: string | null
+          año_hasta?: string | null
+          created_at?: string
+          id?: string
+          marca?: string
+          modelo?: string
+          referencia_alkar?: string | null
+          referencia_geimex?: string | null
+          referencia_jumasa?: string | null
+          referencia_oem?: string | null
+          updated_at?: string
+          vauner_sku?: string
+        }
+        Relationships: []
+      }
       vehicle_models: {
         Row: {
           año_desde: string

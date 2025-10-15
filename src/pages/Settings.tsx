@@ -5,8 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
+import { ArrowLeft, Loader2, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { toast as sonnerToast } from "sonner";
 
 interface Category {
   id: string;
@@ -19,6 +22,10 @@ export default function Settings() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+  const [importStats, setImportStats] = useState<{ inserted: number; updated: number; errors: number } | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -77,6 +84,38 @@ export default function Settings() {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleImportCompatibilities = async () => {
+    if (!csvFile) {
+      sonnerToast.error('Por favor selecciona un archivo CSV');
+      return;
+    }
+    
+    setImporting(true);
+    setImportProgress(0);
+    setImportStats(null);
+    
+    try {
+      const csvText = await csvFile.text();
+      
+      sonnerToast.info('Importando compatibilidades...');
+      
+      const { data, error } = await supabase.functions.invoke('import-vehicle-compatibility', {
+        body: { csv: csvText }
+      });
+      
+      if (error) throw error;
+      
+      setImportStats(data);
+      setImportProgress(100);
+      sonnerToast.success(`Importación completada: ${data.inserted} insertados, ${data.updated} actualizados`);
+    } catch (error: any) {
+      console.error('Error importing:', error);
+      sonnerToast.error(error.message || 'Error al importar compatibilidades');
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -144,6 +183,53 @@ export default function Settings() {
                     No hay categorías configuradas
                   </div>
                 )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Importar Compatibilidades Vauner</CardTitle>
+            <CardDescription>
+              Carga el CSV con marcas, modelos y referencias OEM/equivalentes
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-4">
+              <Input 
+                type="file" 
+                accept=".csv" 
+                onChange={(e) => setCsvFile(e.target.files?.[0] || null)}
+                disabled={importing}
+              />
+              <Button 
+                onClick={handleImportCompatibilities} 
+                disabled={importing || !csvFile}
+              >
+                {importing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Importando...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Importar
+                  </>
+                )}
+              </Button>
+            </div>
+            
+            {importing && (
+              <Progress value={importProgress} className="mt-4" />
+            )}
+            
+            {importStats && (
+              <div className="mt-4 text-sm space-y-1 p-4 bg-muted rounded-lg">
+                <p>✅ <strong>Insertados:</strong> {importStats.inserted}</p>
+                <p>🔄 <strong>Actualizados:</strong> {importStats.updated}</p>
+                <p>❌ <strong>Errores:</strong> {importStats.errors}</p>
               </div>
             )}
           </CardContent>

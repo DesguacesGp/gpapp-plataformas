@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.process-product-image]
 verify_jwt = false
+
+[functions.import-vehicle-compatibility]
+verify_jwt = false

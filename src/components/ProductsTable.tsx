@@ -35,6 +35,16 @@ interface Product {
   año_hasta: string | null;
   raw_data?: any;
   processed_image_url?: string | null;
+  compatibility?: {
+    marca: string;
+    modelo: string;
+    año_desde: string | null;
+    año_hasta: string | null;
+    referencia_oem: string | null;
+    referencia_alkar: string | null;
+    referencia_jumasa: string | null;
+    referencia_geimex: string | null;
+  }[];
 }
 
 interface ProductsTableProps {
@@ -306,11 +316,8 @@ export const ProductsTable = ({
               <TableHead className="w-24">
                 <SortButton field="modelo">Modelo</SortButton>
               </TableHead>
-              <TableHead className="w-24 text-center">Año Desde</TableHead>
-              <TableHead className="w-24 text-center">Año Hasta</TableHead>
-              <TableHead className="w-40">
-                <SortButton field="description">Descripción</SortButton>
-              </TableHead>
+              <TableHead className="w-32">Ref OEM</TableHead>
+              <TableHead className="w-32">Ref Equiv.</TableHead>
               <TableHead className="w-20 text-center">
                 <SortButton field="ai_processed">Título</SortButton>
               </TableHead>
@@ -350,27 +357,109 @@ export const ProductsTable = ({
                   </TableCell>
                   <TableCell className="font-medium">{product.sku}</TableCell>
                   <TableCell className="text-sm truncate max-w-[130px]">{product.articulo || "-"}</TableCell>
-                  <TableCell className="text-sm truncate max-w-[100px]">{product.marca || "-"}</TableCell>
-                  <TableCell className="text-sm truncate max-w-[100px]">{product.modelo || "-"}</TableCell>
-                  <TableCell className="text-center text-xs">
-                    {product.año_desde ? (
-                      <Badge variant="outline" className="font-mono text-[10px]">
-                        {product.año_desde.replace('.', '/')}
-                      </Badge>
+                  <TableCell className="text-xs">
+                    {product.compatibility && product.compatibility.length > 0 ? (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="space-y-1 cursor-pointer">
+                              {product.compatibility.slice(0, 2).map((comp, idx) => (
+                                comp.referencia_oem && (
+                                  <div key={idx} className="truncate max-w-[120px]">
+                                    <Badge variant="secondary" className="text-[10px] font-mono">
+                                      {comp.referencia_oem.split(';')[0]}
+                                      {comp.referencia_oem.split(';').length > 1 && ' +'}
+                                    </Badge>
+                                  </div>
+                                )
+                              ))}
+                              {product.compatibility.length > 2 && (
+                                <span className="text-[10px] text-muted-foreground">
+                                  +{product.compatibility.length - 2} más
+                                </span>
+                              )}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-sm">
+                            <div className="space-y-2 text-xs">
+                              <p className="font-semibold">Referencias OEM:</p>
+                              {product.compatibility.map((comp, idx) => (
+                                comp.referencia_oem && (
+                                  <div key={idx} className="border-l-2 border-blue-500 pl-2">
+                                    <p className="font-mono text-[10px]">
+                                      {comp.referencia_oem.split(';').join(', ')}
+                                    </p>
+                                    <p className="text-muted-foreground text-[10px]">
+                                      {comp.marca} {comp.modelo} ({comp.año_desde}-{comp.año_hasta || 'actual'})
+                                    </p>
+                                  </div>
+                                )
+                              ))}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     ) : (
                       <span className="text-muted-foreground">-</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-center text-xs">
-                    {product.año_hasta ? (
-                      <Badge variant="outline" className="font-mono text-[10px]">
-                        {product.año_hasta.replace('.', '/')}
-                      </Badge>
+                  <TableCell className="text-xs">
+                    {product.compatibility && product.compatibility.length > 0 ? (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex flex-wrap gap-1 cursor-pointer">
+                              {(() => {
+                                const allRefs = product.compatibility
+                                  .flatMap(comp => [
+                                    comp.referencia_alkar && { type: 'ALK', ref: comp.referencia_alkar, comp },
+                                    comp.referencia_jumasa && { type: 'JUM', ref: comp.referencia_jumasa, comp },
+                                    comp.referencia_geimex && { type: 'GEI', ref: comp.referencia_geimex, comp }
+                                  ])
+                                  .filter(Boolean);
+                                
+                                return (
+                                  <>
+                                    {allRefs.slice(0, 3).map((item: any, idx) => (
+                                      <Badge key={idx} variant="outline" className="text-[9px] px-1">
+                                        {item.type}
+                                      </Badge>
+                                    ))}
+                                    {allRefs.length > 3 && (
+                                      <span className="text-[9px] text-muted-foreground">+{allRefs.length - 3}</span>
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-sm">
+                            <div className="space-y-2 text-xs">
+                              <p className="font-semibold">Referencias Equivalentes:</p>
+                              {product.compatibility.map((comp, idx) => (
+                                <div key={idx} className="space-y-1 border-l-2 border-green-500 pl-2">
+                                  {comp.referencia_alkar && (
+                                    <p><span className="font-semibold">ALKAR:</span> <span className="font-mono text-[10px]">{comp.referencia_alkar}</span></p>
+                                  )}
+                                  {comp.referencia_jumasa && (
+                                    <p><span className="font-semibold">JUMASA:</span> <span className="font-mono text-[10px]">{comp.referencia_jumasa}</span></p>
+                                  )}
+                                  {comp.referencia_geimex && (
+                                    <p><span className="font-semibold">GEIMEX:</span> <span className="font-mono text-[10px]">{comp.referencia_geimex}</span></p>
+                                  )}
+                                  <p className="text-muted-foreground text-[10px]">
+                                    {comp.marca} {comp.modelo} ({comp.año_desde}-{comp.año_hasta || 'actual'})
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     ) : (
                       <span className="text-muted-foreground">-</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-xs truncate max-w-[160px]">{product.description}</TableCell>
                   <TableCell className="text-center">
                     <Tooltip>
                       <TooltipTrigger>
