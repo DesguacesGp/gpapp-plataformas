@@ -33,6 +33,7 @@ interface Product {
   modelo: string | null;
   año_desde: string | null;
   año_hasta: string | null;
+  raw_data?: any;
 }
 
 interface ProductsTableProps {
@@ -391,9 +392,20 @@ export const ProductsTable = ({
                     €{(product.final_price || product.price).toFixed(2)}
                   </TableCell>
                   <TableCell className="text-center">
-                    <Badge variant={product.has_image ? "default" : "secondary"}>
-                      {product.has_image ? "Sí" : "No"}
-                    </Badge>
+                    {product.has_image && product.raw_data?.image ? (
+                      <a 
+                        href={`https://www.vauner.pt/${product.raw_data.image}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-600 hover:underline truncate block max-w-[150px]"
+                      >
+                        {product.raw_data.image}
+                      </a>
+                    ) : (
+                      <Badge variant={product.has_image ? "default" : "secondary"}>
+                        {product.has_image ? "Sí" : "No"}
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="text-xs truncate max-w-[100px]">{product.category || "Sin categoría"}</Badge>

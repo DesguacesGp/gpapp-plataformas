@@ -23,6 +23,7 @@ interface Product {
   modelo: string | null;
   año_desde: string | null;
   año_hasta: string | null;
+  raw_data?: any;
 }
 
 const Index = () => {
