@@ -667,30 +667,37 @@ const Index = () => {
         return { ...product, final_price: finalPrice };
       });
 
-      // Load ALL compatibility data
+      // Load ALL compatibility data in batches (max 1000 SKUs per query)
       const skus = allProducts.map(p => p.sku);
-      const { data: compatData } = await supabase
-        .from('vehicle_compatibility')
-        .select('*')
-        .in('vauner_sku', skus);
-
-      // Group compatibilities by SKU
       const compatMap = new Map<string, any[]>();
-      compatData?.forEach(comp => {
-        if (!compatMap.has(comp.vauner_sku)) {
-          compatMap.set(comp.vauner_sku, []);
-        }
-        compatMap.get(comp.vauner_sku)!.push({
-          marca: comp.marca,
-          modelo: comp.modelo,
-          año_desde: comp.año_desde,
-          año_hasta: comp.año_hasta,
-          referencia_oem: comp.referencia_oem,
-          referencia_alkar: comp.referencia_alkar,
-          referencia_jumasa: comp.referencia_jumasa,
-          referencia_geimex: comp.referencia_geimex
+      const batchSizeCompat = 1000;
+      
+      for (let i = 0; i < skus.length; i += batchSizeCompat) {
+        const skuBatch = skus.slice(i, i + batchSizeCompat);
+        const { data: compatData } = await supabase
+          .from('vehicle_compatibility')
+          .select('*')
+          .in('vauner_sku', skuBatch);
+
+        // Group compatibilities by SKU
+        compatData?.forEach(comp => {
+          if (!compatMap.has(comp.vauner_sku)) {
+            compatMap.set(comp.vauner_sku, []);
+          }
+          compatMap.get(comp.vauner_sku)!.push({
+            marca: comp.marca,
+            modelo: comp.modelo,
+            año_desde: comp.año_desde,
+            año_hasta: comp.año_hasta,
+            referencia_oem: comp.referencia_oem,
+            referencia_alkar: comp.referencia_alkar,
+            referencia_jumasa: comp.referencia_jumasa,
+            referencia_geimex: comp.referencia_geimex
+          });
         });
-      });
+      }
+      
+      console.log(`Compatibilidades cargadas: ${compatMap.size} productos con datos`);
 
       const productsWithCompat = productsWithFinalPrice.map(product => ({
         ...product,
@@ -785,30 +792,37 @@ const Index = () => {
         return { ...product, final_price: finalPrice };
       });
 
-      // Load compatibility data
+      // Load compatibility data in batches (max 1000 SKUs per query)
       const skus = categoryProducts.map(p => p.sku);
-      const { data: compatData } = await supabase
-        .from('vehicle_compatibility')
-        .select('*')
-        .in('vauner_sku', skus);
-
-      // Group compatibilities by SKU
       const compatMap = new Map<string, any[]>();
-      compatData?.forEach(comp => {
-        if (!compatMap.has(comp.vauner_sku)) {
-          compatMap.set(comp.vauner_sku, []);
-        }
-        compatMap.get(comp.vauner_sku)!.push({
-          marca: comp.marca,
-          modelo: comp.modelo,
-          año_desde: comp.año_desde,
-          año_hasta: comp.año_hasta,
-          referencia_oem: comp.referencia_oem,
-          referencia_alkar: comp.referencia_alkar,
-          referencia_jumasa: comp.referencia_jumasa,
-          referencia_geimex: comp.referencia_geimex
+      const batchSizeCompat = 1000;
+      
+      for (let i = 0; i < skus.length; i += batchSizeCompat) {
+        const skuBatch = skus.slice(i, i + batchSizeCompat);
+        const { data: compatData } = await supabase
+          .from('vehicle_compatibility')
+          .select('*')
+          .in('vauner_sku', skuBatch);
+
+        // Group compatibilities by SKU
+        compatData?.forEach(comp => {
+          if (!compatMap.has(comp.vauner_sku)) {
+            compatMap.set(comp.vauner_sku, []);
+          }
+          compatMap.get(comp.vauner_sku)!.push({
+            marca: comp.marca,
+            modelo: comp.modelo,
+            año_desde: comp.año_desde,
+            año_hasta: comp.año_hasta,
+            referencia_oem: comp.referencia_oem,
+            referencia_alkar: comp.referencia_alkar,
+            referencia_jumasa: comp.referencia_jumasa,
+            referencia_geimex: comp.referencia_geimex
+          });
         });
-      });
+      }
+      
+      console.log(`Compatibilidades cargadas: ${compatMap.size} productos con datos`);
 
       const productsWithCompat = productsWithFinalPrice.map(product => ({
         ...product,
