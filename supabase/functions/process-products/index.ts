@@ -119,13 +119,13 @@ Deno.serve(async (req) => {
       offset = currentQueue?.processed_count || 0
       console.log(`📍 Continuing from queue ${queueId} with offset: ${offset} products already processed`)
       
-      // Build query: select from catalog using created_at ordering and offset
+      // Build query: select from catalog using id ordering and offset
+      // CRITICAL: Order ONLY by id to ensure consistent pagination
       let query = supabaseClient
         .from('vauner_products')
         .select('id')
         .in('sku', oemSkuList)
-        .order('created_at', { ascending: true })
-        .order('id', { ascending: true }) // Tie-breaker for same created_at
+        .order('id', { ascending: true })
       
       // If NOT force reprocess, filter only products without translated_title
       if (!forceReprocess) {
