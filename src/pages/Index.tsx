@@ -53,7 +53,6 @@ const Index = () => {
   const [totalProducts, setTotalProducts] = useState(0);
   const [totalWithImages, setTotalWithImages] = useState(0);
   const [processedProducts, setProcessedProducts] = useState(0);
-  const [productsWithOem, setProductsWithOem] = useState(0);
   const [imageStats, setImageStats] = useState({ processed: 0, pending: 0, none: 0 });
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -271,30 +270,6 @@ const Index = () => {
         });
       }
 
-      // Get count of products IN CATALOG with OEM references
-      const { data: oemSkus, error: oemSkusError } = await supabase
-        .from('vehicle_compatibility')
-        .select('vauner_sku')
-        .not('referencia_oem', 'is', null)
-        .neq('referencia_oem', '');
-
-      if (!oemSkusError && oemSkus) {
-        const uniqueOemSkus = [...new Set(oemSkus.map(x => x.vauner_sku))];
-        
-        // Count how many of these SKUs exist in vauner_products catalog
-        const { count: catalogOemCount, error: catalogError } = await supabase
-          .from('vauner_products')
-          .select('*', { count: 'exact', head: true })
-          .in('sku', uniqueOemSkus);
-        
-        if (!catalogError) {
-          setProductsWithOem(catalogOemCount || 0);
-        } else {
-          setProductsWithOem(0);
-        }
-      } else {
-        setProductsWithOem(0);
-      }
     } catch (error: any) {
       console.error('Error loading products:', error);
       toast.error('Error al cargar productos: ' + error.message);
@@ -446,40 +421,15 @@ const Index = () => {
     setIsProcessingAI(true);
     
     try {
-      toast.info('🤖 Calculando productos con OEM a reprocesar...');
+      toast.info('🤖 Iniciando reprocesamiento de productos con OEM...');
       
-      // Get SKUs with OEM from vehicle_compatibility
-      const { data: oemSkus, error: oemSkusError } = await supabase
-        .from('vehicle_compatibility')
-        .select('vauner_sku')
-        .not('referencia_oem', 'is', null)
-        .neq('referencia_oem', '');
-
-      if (oemSkusError) throw oemSkusError;
-
-      const uniqueOemSkus = [...new Set(oemSkus?.map(x => x.vauner_sku) || [])];
-      
-      // Count how many of these SKUs exist in vauner_products catalog
-      const { count: totalCount, error: countError } = await supabase
-        .from('vauner_products')
-        .select('*', { count: 'exact', head: true })
-        .in('sku', uniqueOemSkus);
-      
-      if (countError) throw countError;
-
-      if (!totalCount || totalCount === 0) {
-        toast.error('No hay productos con OEM en el catálogo para reprocesar');
-        return;
-      }
-
-      toast.info(`🤖 Iniciando reprocesamiento FORZADO de ${totalCount} productos con OEM...`);
-      
+      // Create queue entry - edge function will calculate total
       const { data: queueData, error: queueError } = await supabase
         .from('processing_queue')
         .insert({
           status: 'pending',
           batch_size: 50,
-          total_count: totalCount,
+          total_count: 0,
           processed_count: 0
         })
         .select()
@@ -487,6 +437,11 @@ const Index = () => {
 
       if (queueError) throw queueError;
 
+      // Call edge function with forceReprocess: true
+      // Edge function will:
+      // 1. Find SKUs with OEM in vehicle_compatibility
+      // 2. Filter only those in vauner_products catalog
+      // 3. Process them in batches with forceReprocess: true
       const { error: processError } = await supabase.functions.invoke('process-products', {
         body: { 
           queueId: queueData.id,
@@ -496,7 +451,7 @@ const Index = () => {
 
       if (processError) throw processError;
 
-      toast.success(`✅ Reprocesamiento iniciado para ${totalCount} productos. Esto tomará varias horas.`);
+      toast.success('✅ Reprocesamiento iniciado. Se procesarán todos los productos con OEM del catálogo.');
       
       setTimeout(() => loadProducts(), 2000);
     } catch (error: any) {
@@ -790,17 +745,6 @@ const Index = () => {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Con Ref OEM</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{productsWithOem}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Productos con referencias OEM
-              </p>
-            </CardContent>
-          </Card>
         </div>
 
         <Card>
