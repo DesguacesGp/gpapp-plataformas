@@ -6,8 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Heartbeat interval (30 seconds)
-const HEARTBEAT_INTERVAL = 30000
+// Heartbeat interval (20 seconds for faster stalled job detection)
+const HEARTBEAT_INTERVAL = 20000
 let heartbeatTimer: number | null = null
 
 // Function to update heartbeat
@@ -511,8 +511,8 @@ Stock: ${product.stock}${compatibilityPrompt}`
               console.log(`Successfully processed ${product.sku}`)
               processedCount.success++
               
-              // Save incremental progress every 10 products
-              if (processedCount.success % 10 === 0 && queueId) {
+              // Save progress after EVERY product to prevent data loss on shutdown
+              if (queueId) {
                 const currentProductId = product.id
                 await supabaseClient
                   .from('processing_queue')
@@ -522,7 +522,11 @@ Stock: ${product.stock}${compatibilityPrompt}`
                     updated_at: new Date().toISOString()
                   })
                   .eq('id', queueId)
-                console.log(`💾 Progress checkpoint - ${processedCount.success} products processed, last_id: ${currentProductId}`)
+                
+                // Log every 5 products to reduce console noise
+                if (processedCount.success % 5 === 0) {
+                  console.log(`💾 Progress saved - ${processedCount.success} products processed, last_id: ${currentProductId}`)
+                }
               }
             }
 
@@ -562,9 +566,9 @@ Stock: ${product.stock}${compatibilityPrompt}`
           lastProductInBatch = productsToProcess[productsToProcess.length - 1]
         }
         
-        // Update current queue entry
+        // CRITICAL: Save final progress BEFORE creating new queue to ensure atomicity
         if (queueId) {
-          await supabaseClient
+          const { error: finalUpdateError } = await supabaseClient
             .from('processing_queue')
             .update({ 
               status: 'completed',
@@ -574,8 +578,10 @@ Stock: ${product.stock}${compatibilityPrompt}`
             })
             .eq('id', queueId)
           
-          if (lastProductInBatch) {
-            console.log(`✅ Saved progress - Last product ID: ${lastProductInBatch}`)
+          if (finalUpdateError) {
+            console.error('⚠️ Failed to save final progress:', finalUpdateError)
+          } else if (lastProductInBatch) {
+            console.log(`✅ Final progress saved - Last product ID: ${lastProductInBatch}`)
           }
         }
         
