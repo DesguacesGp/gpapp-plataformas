@@ -121,22 +121,15 @@ Deno.serve(async (req) => {
       // Build query: select from catalog, only products that have OEM in compatibility
       let query = supabaseClient
         .from('vauner_products')
-        .select('id, created_at')
+        .select('id')
         .in('sku', oemSkuList)
-        .order('created_at', { ascending: true })
-        .limit(50)
+        .order('id', { ascending: true })
+        .limit(25)
       
-      // If we have last_product_id, filter products created after it
+      // If we have last_product_id, filter products after it using direct ID comparison
       if (lastProcessedId) {
-        const { data: lastProduct } = await supabaseClient
-          .from('vauner_products')
-          .select('created_at')
-          .eq('id', lastProcessedId)
-          .single()
-        
-        if (lastProduct) {
-          query = query.gt('created_at', lastProduct.created_at)
-        }
+        query = query.gt('id', lastProcessedId)
+        console.log(`📍 Filtering products with id > ${lastProcessedId}`)
       }
       
       // If NOT force reprocess, filter only products without translated_title
@@ -517,6 +510,20 @@ Stock: ${product.stock}${compatibilityPrompt}`
             } else {
               console.log(`Successfully processed ${product.sku}`)
               processedCount.success++
+              
+              // Save incremental progress every 10 products
+              if (processedCount.success % 10 === 0 && queueId) {
+                const currentProductId = product.id
+                await supabaseClient
+                  .from('processing_queue')
+                  .update({ 
+                    last_product_id: currentProductId,
+                    processed_count: processedCount.success,
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('id', queueId)
+                console.log(`💾 Progress checkpoint - ${processedCount.success} products processed, last_id: ${currentProductId}`)
+              }
             }
 
             // Reduced delay to 1500ms for faster processing (still respects rate limits)
@@ -580,7 +587,7 @@ Stock: ${product.stock}${compatibilityPrompt}`
             .from('processing_queue')
             .insert({
               status: 'pending',
-              batch_size: 50,
+              batch_size: 25,
               total_count: remainingCount,
               last_product_id: lastProductInBatch
             })
