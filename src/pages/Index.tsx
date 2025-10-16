@@ -95,14 +95,19 @@ const Index = () => {
           table: 'vauner_products'
         },
         (payload) => {
-          // Check if translated_title was just added (AI processing completed)
           const oldRecord = payload.old as any;
           const newRecord = payload.new as any;
           
-          if (!oldRecord.translated_title && newRecord.translated_title) {
-            // Product was just processed by AI
-            setProcessedProducts(prev => prev + 1);
-            toast.success(`Producto procesado: ${newRecord.sku}`);
+          // Show toast when translated_title is updated (new or reprocessed)
+          if (newRecord.translated_title && oldRecord.translated_title !== newRecord.translated_title) {
+            toast.success(`✅ Reprocesado: ${newRecord.sku}`, {
+              description: newRecord.translated_title.substring(0, 60) + '...'
+            });
+            
+            // Update counter if it's a new processing (not a reprocess)
+            if (!oldRecord.translated_title) {
+              setProcessedProducts(prev => prev + 1);
+            }
           }
         }
       )
