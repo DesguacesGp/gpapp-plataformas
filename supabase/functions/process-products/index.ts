@@ -535,11 +535,11 @@ Stock: ${product.stock}${compatibilityPrompt}`
             .eq('id', queueId)
         }
         
-        // If there are more products, create a new queue entry (cron will pick it up)
+        // If there are more products, create a new queue entry AND trigger processing immediately
         if (remainingCount && remainingCount > 0) {
-          console.log('More products remaining, creating new queue entry...')
+          console.log('More products remaining, creating new queue entry and triggering immediately...')
           
-          const { data: newQueue } = await supabaseClient
+          const { data: newQueue, error: newQueueError } = await supabaseClient
             .from('processing_queue')
             .insert({
               status: 'pending',
@@ -549,8 +549,38 @@ Stock: ${product.stock}${compatibilityPrompt}`
             .select()
             .single()
 
-          if (newQueue) {
-            console.log(`✅ Created new queue entry: ${newQueue.id} - The cron job will pick it up automatically in max 2 minutes`)
+          if (newQueueError) {
+            console.error('Failed to create new queue entry:', newQueueError)
+          } else if (newQueue) {
+            console.log(`✅ Created new queue entry: ${newQueue.id}`)
+            
+            // Trigger next batch immediately without waiting for cron
+            try {
+              console.log('🚀 Triggering next batch immediately...')
+              
+              const nextBatchResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/process-products`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ 
+                  queueId: newQueue.id,
+                  forceReprocess: forceReprocess
+                })
+              })
+              
+              if (nextBatchResponse.ok) {
+                console.log('✅ Next batch triggered successfully - continuous processing active')
+              } else {
+                const errorText = await nextBatchResponse.text()
+                console.error(`⚠️ Failed to trigger next batch: ${nextBatchResponse.status} - ${errorText}`)
+                console.log('Cron job will pick it up in max 2 minutes as fallback')
+              }
+            } catch (triggerError) {
+              console.error('⚠️ Error triggering next batch:', triggerError)
+              console.log('Cron job will pick it up in max 2 minutes as fallback')
+            }
           }
         } else {
           console.log('✅ All products processed!')
