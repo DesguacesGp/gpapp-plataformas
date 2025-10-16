@@ -25,6 +25,7 @@ interface Product {
   año_hasta: string | null;
   raw_data?: any;
   processed_image_url?: string | null;
+  compatibility_image_url?: string | null;
   compatibility?: {
     marca: string;
     modelo: string;
@@ -475,30 +476,116 @@ const Index = () => {
       return;
     }
 
-    const selectedProducts = products.filter(p => selectedIds.includes(p.id));
-    const csv = [
-      ['SKU', 'Descripción', 'Título Traducido', 'Bullet Points', 'Stock', 'Precio Base', 'Precio Final', 'Imagen', 'Categoría'],
-      ...selectedProducts.map(p => [
-        p.sku,
-        p.description,
-        p.translated_title || '',
-        p.bullet_points ? p.bullet_points.join(' | ') : '',
-        p.stock,
-        p.price,
-        p.final_price || p.price,
-        p.has_image ? 'Sí' : 'No',
-        p.category || ''
-      ])
-    ].map(row => row.join(',')).join('\n');
+    // Utility function to escape CSV fields (handles commas, quotes, newlines)
+    const escapeCSV = (field: any): string => {
+      if (field === null || field === undefined) return '';
+      const str = String(field);
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
 
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const selectedProducts = products.filter(p => selectedIds.includes(p.id));
+    
+    // CSV headers with all data fields
+    const headers = [
+      'SKU',
+      'Descripción Original',
+      'Título Traducido',
+      'Artículo',
+      'Marca',
+      'Modelo',
+      'Año Desde',
+      'Año Hasta',
+      'Stock',
+      'Precio Base',
+      'Precio Final',
+      'Categoría',
+      'Referencias OEM',
+      'Referencias ALKAR',
+      'Referencias JUMASA',
+      'Referencias GEIMEX',
+      'Imagen Procesada',
+      'Imagen Tabla Compatibilidad',
+      'Bullet 1',
+      'Bullet 2',
+      'Bullet 3',
+      'Bullet 4',
+      'Bullet 5'
+    ];
+
+    // Process each product and extract all data
+    const rows = selectedProducts.map(p => {
+      // Group compatibility references by type
+      const oemRefs = (p.compatibility || [])
+        .map(c => c.referencia_oem)
+        .filter(ref => ref !== null && ref !== undefined)
+        .join(', ');
+
+      const alkarRefs = (p.compatibility || [])
+        .map(c => c.referencia_alkar)
+        .filter(ref => ref !== null && ref !== undefined)
+        .join(', ');
+
+      const jumasaRefs = (p.compatibility || [])
+        .map(c => c.referencia_jumasa)
+        .filter(ref => ref !== null && ref !== undefined)
+        .join(', ');
+
+      const geimexRefs = (p.compatibility || [])
+        .map(c => c.referencia_geimex)
+        .filter(ref => ref !== null && ref !== undefined)
+        .join(', ');
+
+      // Extract individual bullet points (up to 5)
+      const bullets = p.bullet_points || [];
+      const bullet1 = bullets[0] || '';
+      const bullet2 = bullets[1] || '';
+      const bullet3 = bullets[2] || '';
+      const bullet4 = bullets[3] || '';
+      const bullet5 = bullets[4] || '';
+
+      return [
+        escapeCSV(p.sku),
+        escapeCSV(p.description),
+        escapeCSV(p.translated_title),
+        escapeCSV(p.articulo),
+        escapeCSV(p.marca),
+        escapeCSV(p.modelo),
+        escapeCSV(p.año_desde),
+        escapeCSV(p.año_hasta),
+        escapeCSV(p.stock),
+        escapeCSV(p.price),
+        escapeCSV(p.final_price || p.price),
+        escapeCSV(p.category),
+        escapeCSV(oemRefs),
+        escapeCSV(alkarRefs),
+        escapeCSV(jumasaRefs),
+        escapeCSV(geimexRefs),
+        escapeCSV(p.processed_image_url),
+        escapeCSV(p.compatibility_image_url),
+        escapeCSV(bullet1),
+        escapeCSV(bullet2),
+        escapeCSV(bullet3),
+        escapeCSV(bullet4),
+        escapeCSV(bullet5)
+      ];
+    });
+
+    // Build CSV with UTF-8 BOM for Excel compatibility
+    const csvContent = '\uFEFF' + [headers, ...rows]
+      .map(row => row.join(','))
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `productos-vauner-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     
-    toast.success(`${selectedIds.length} productos exportados`);
+    toast.success(`${selectedIds.length} productos exportados con datos completos`);
   };
 
 
