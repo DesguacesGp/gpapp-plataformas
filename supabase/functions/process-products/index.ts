@@ -105,42 +105,37 @@ Deno.serve(async (req) => {
     // Get next batch of products FROM CATALOG (vauner_products) filtered by OEM
     let productsToProcess = productIds
     if (!productsToProcess && queueId) {
-      // Get last_product_id from current queue to continue from where we left off
-      let lastProcessedId = null
+      // Get processed_count from current queue to use as offset
       const { data: currentQueue } = await supabaseClient
         .from('processing_queue')
-        .select('last_product_id')
+        .select('processed_count')
         .eq('id', queueId)
         .single()
       
-      lastProcessedId = currentQueue?.last_product_id
-      if (lastProcessedId) {
-        console.log(`📍 Continuing from last processed ID: ${lastProcessedId}`)
-      }
+      const offset = currentQueue?.processed_count || 0
+      console.log(`📍 Continuing from offset: ${offset} products already processed`)
       
-      // Build query: select from catalog, only products that have OEM in compatibility
+      // Build query: select from catalog using created_at ordering and offset
       let query = supabaseClient
         .from('vauner_products')
         .select('id')
         .in('sku', oemSkuList)
-        .order('id', { ascending: true })
-        .limit(25)
-      
-      // If we have last_product_id, filter products after it using direct ID comparison
-      if (lastProcessedId) {
-        query = query.gt('id', lastProcessedId)
-        console.log(`📍 Filtering products with id > ${lastProcessedId}`)
-      }
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true }) // Tie-breaker for same created_at
       
       // If NOT force reprocess, filter only products without translated_title
       if (!forceReprocess) {
         query = query.is('translated_title', null)
       }
       
+      // Apply offset and limit using range
+      const batchSize = 25
+      query = query.range(offset, offset + batchSize - 1)
+      
       const { data: nextBatch } = await query
       
       productsToProcess = nextBatch?.map(p => p.id) || []
-      console.log(`📦 Processing batch of ${productsToProcess.length} products from catalog with OEM`)
+      console.log(`📦 Processing batch of ${productsToProcess.length} products from catalog with OEM (offset: ${offset})`)
       if (forceReprocess) {
         console.log(`🔄 FORCE REPROCESS MODE - Will update all ${oemSkuList.length} catalog products with OEM`)
       }
@@ -511,22 +506,18 @@ Stock: ${product.stock}${compatibilityPrompt}`
               console.log(`Successfully processed ${product.sku}`)
               processedCount.success++
               
-              // Save progress after EVERY product to prevent data loss on shutdown
-              if (queueId) {
-                const currentProductId = product.id
+              // Save progress every 5 products to prevent data loss and reduce overhead
+              if (queueId && processedCount.success % 5 === 0) {
                 await supabaseClient
                   .from('processing_queue')
                   .update({ 
-                    last_product_id: currentProductId,
                     processed_count: processedCount.success,
+                    last_heartbeat: new Date().toISOString(),
                     updated_at: new Date().toISOString()
                   })
                   .eq('id', queueId)
                 
-                // Log every 5 products to reduce console noise
-                if (processedCount.success % 5 === 0) {
-                  console.log(`💾 Progress saved - ${processedCount.success} products processed, last_id: ${currentProductId}`)
-                }
+                console.log(`💾 Progress saved - ${processedCount.success} products processed (offset updated)`)
               }
             }
 
@@ -560,12 +551,6 @@ Stock: ${product.stock}${compatibilityPrompt}`
         // Stop heartbeat
         stopHeartbeat()
         
-        // Get the last product ID from the current batch for continuation
-        let lastProductInBatch = null
-        if (productsToProcess && productsToProcess.length > 0) {
-          lastProductInBatch = productsToProcess[productsToProcess.length - 1]
-        }
-        
         // CRITICAL: Save final progress BEFORE creating new queue to ensure atomicity
         if (queueId) {
           const { error: finalUpdateError } = await supabaseClient
@@ -574,14 +559,14 @@ Stock: ${product.stock}${compatibilityPrompt}`
               status: 'completed',
               processed_count: processedCount.success,
               completed_at: new Date().toISOString(),
-              last_product_id: lastProductInBatch
+              updated_at: new Date().toISOString()
             })
             .eq('id', queueId)
           
           if (finalUpdateError) {
             console.error('⚠️ Failed to save final progress:', finalUpdateError)
-          } else if (lastProductInBatch) {
-            console.log(`✅ Final progress saved - Last product ID: ${lastProductInBatch}`)
+          } else {
+            console.log(`✅ Final progress saved - ${processedCount.success} products processed`)
           }
         }
         
@@ -595,7 +580,7 @@ Stock: ${product.stock}${compatibilityPrompt}`
               status: 'pending',
               batch_size: 25,
               total_count: remainingCount,
-              last_product_id: lastProductInBatch
+              processed_count: processedCount.success // Offset for next batch
             })
             .select()
             .single()

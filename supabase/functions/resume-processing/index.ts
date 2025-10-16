@@ -112,13 +112,23 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Check if there are products pending and no active processing
+    // Get SKUs with OEM references to filter products that need processing
+    const { data: skusWithOem } = await supabaseClient
+      .from('vehicle_compatibility')
+      .select('vauner_sku')
+      .not('referencia_oem', 'is', null)
+      .neq('referencia_oem', '')
+
+    const oemSkuList = [...new Set(skusWithOem?.map(x => x.vauner_sku) || [])]
+
+    // Check if there are products with OEM that need processing
     const { count: remainingCount } = await supabaseClient
       .from('vauner_products')
       .select('*', { count: 'exact', head: true })
-      .is('translated_title', null)
+      .in('sku', oemSkuList)
+      .or('translated_title.is.null,articulo.is.null,marca.is.null,modelo.is.null')
 
-    console.log(`📊 Remaining products to process: ${remainingCount || 0}`)
+    console.log(`📊 Remaining products with OEM to process: ${remainingCount || 0}`)
 
     if (!remainingCount || remainingCount === 0) {
       console.log('✅ No products pending processing')
