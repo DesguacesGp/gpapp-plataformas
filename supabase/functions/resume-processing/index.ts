@@ -121,10 +121,10 @@ Deno.serve(async (req) => {
 
     const oemSkuList = [...new Set(skusWithOem?.map(x => x.vauner_sku) || [])]
 
-    // Check if there are products with OEM that need processing
+    // CRITICAL: Check products with OEM that need processing (missing ANY of the key fields)
     const { count: remainingCount } = await supabaseClient
       .from('vauner_products')
-      .select('*', { count: 'exact', head: true })
+      .select('sku', { count: 'exact', head: true })
       .in('sku', oemSkuList)
       .or('translated_title.is.null,articulo.is.null,marca.is.null,modelo.is.null')
 

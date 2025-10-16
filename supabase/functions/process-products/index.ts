@@ -104,16 +104,20 @@ Deno.serve(async (req) => {
 
     // Get next batch of products FROM CATALOG (vauner_products) filtered by OEM
     let productsToProcess = productIds
+    let currentQueue = null
+    let offset = 0
+    
     if (!productsToProcess && queueId) {
-      // Get processed_count from current queue to use as offset
-      const { data: currentQueue } = await supabaseClient
+      // CRITICAL: Get the full current queue to read processed_count (offset)
+      const { data: queue } = await supabaseClient
         .from('processing_queue')
-        .select('processed_count')
+        .select('*')
         .eq('id', queueId)
         .single()
       
-      const offset = currentQueue?.processed_count || 0
-      console.log(`📍 Continuing from offset: ${offset} products already processed`)
+      currentQueue = queue
+      offset = currentQueue?.processed_count || 0
+      console.log(`📍 Continuing from queue ${queueId} with offset: ${offset} products already processed`)
       
       // Build query: select from catalog using created_at ordering and offset
       let query = supabaseClient
@@ -506,18 +510,21 @@ Stock: ${product.stock}${compatibilityPrompt}`
               console.log(`Successfully processed ${product.sku}`)
               processedCount.success++
               
+              // CRITICAL: Calculate absolute count (offset + products processed in this batch)
+              const absoluteCount = offset + processedCount.success
+              
               // Save progress every 5 products to prevent data loss and reduce overhead
               if (queueId && processedCount.success % 5 === 0) {
                 await supabaseClient
                   .from('processing_queue')
                   .update({ 
-                    processed_count: processedCount.success,
+                    processed_count: absoluteCount,  // Absolute count, not relative
                     last_heartbeat: new Date().toISOString(),
                     updated_at: new Date().toISOString()
                   })
                   .eq('id', queueId)
                 
-                console.log(`💾 Progress saved - ${processedCount.success} products processed (offset updated)`)
+                console.log(`💾 Progress saved - ${absoluteCount} products processed total (offset updated)`)
               }
             }
 
@@ -551,13 +558,16 @@ Stock: ${product.stock}${compatibilityPrompt}`
         // Stop heartbeat
         stopHeartbeat()
         
+        // CRITICAL: Calculate absolute count for final update
+        const absoluteCount = offset + processedCount.success
+        
         // CRITICAL: Save final progress BEFORE creating new queue to ensure atomicity
         if (queueId) {
           const { error: finalUpdateError } = await supabaseClient
             .from('processing_queue')
             .update({ 
               status: 'completed',
-              processed_count: processedCount.success,
+              processed_count: absoluteCount,  // Absolute count
               completed_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
             })
@@ -566,7 +576,7 @@ Stock: ${product.stock}${compatibilityPrompt}`
           if (finalUpdateError) {
             console.error('⚠️ Failed to save final progress:', finalUpdateError)
           } else {
-            console.log(`✅ Final progress saved - ${processedCount.success} products processed`)
+            console.log(`✅ Final progress saved - ${absoluteCount} products processed total`)
           }
         }
         
@@ -580,7 +590,7 @@ Stock: ${product.stock}${compatibilityPrompt}`
               status: 'pending',
               batch_size: 25,
               total_count: remainingCount,
-              processed_count: processedCount.success // Offset for next batch
+              processed_count: absoluteCount // CRITICAL: Use absolute count as offset for next batch
             })
             .select()
             .single()
