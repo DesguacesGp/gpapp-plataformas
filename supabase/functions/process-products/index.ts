@@ -133,13 +133,14 @@ Deno.serve(async (req) => {
       }
       
       // Apply offset and limit using range
-      const batchSize = 25
+      const batchSize = 10 // TEMPORARY: Reduced for testing 2 batches
       query = query.range(offset, offset + batchSize - 1)
       
       const { data: nextBatch } = await query
       
       productsToProcess = nextBatch?.map(p => p.id) || []
-      console.log(`📦 Processing batch of ${productsToProcess.length} products from catalog with OEM (offset: ${offset})`)
+      console.log(`📦 Batch range: offset ${offset} to ${offset + productsToProcess.length - 1}, processing ${productsToProcess.length} products`)
+      console.log(`📊 Total catalog with OEM: ${oemSkuList.length} products`)
       if (forceReprocess) {
         console.log(`🔄 FORCE REPROCESS MODE - Will update all ${oemSkuList.length} catalog products with OEM`)
       }
@@ -588,7 +589,7 @@ Stock: ${product.stock}${compatibilityPrompt}`
             .from('processing_queue')
             .insert({
               status: 'pending',
-              batch_size: 25,
+              batch_size: 10, // TEMPORARY: Matching test batch size
               total_count: remainingCount,
               processed_count: absoluteCount // CRITICAL: Use absolute count as offset for next batch
             })
@@ -598,7 +599,7 @@ Stock: ${product.stock}${compatibilityPrompt}`
           if (newQueueError) {
             console.error('Failed to create new queue entry:', newQueueError)
           } else if (newQueue) {
-            console.log(`✅ Created new queue entry: ${newQueue.id}`)
+            console.log(`✅ Created new queue entry: ${newQueue.id} with offset: ${absoluteCount} (processed so far: ${absoluteCount})`)
             
             // Trigger next batch immediately without waiting for cron
             try {
