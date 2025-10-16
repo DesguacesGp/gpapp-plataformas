@@ -470,24 +470,17 @@ const Index = () => {
 
 
 
-  const exportSelected = () => {
-    if (selectedIds.length === 0) {
-      toast.warning('Selecciona al menos un producto para exportar');
-      return;
+  // Utility function to escape CSV fields (handles commas, quotes, newlines)
+  const escapeCSV = (field: any): string => {
+    if (field === null || field === undefined) return '';
+    const str = String(field);
+    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+      return `"${str.replace(/"/g, '""')}"`;
     }
+    return str;
+  };
 
-    // Utility function to escape CSV fields (handles commas, quotes, newlines)
-    const escapeCSV = (field: any): string => {
-      if (field === null || field === undefined) return '';
-      const str = String(field);
-      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-        return `"${str.replace(/"/g, '""')}"`;
-      }
-      return str;
-    };
-
-    const selectedProducts = products.filter(p => selectedIds.includes(p.id));
-    
+  const buildCSVFromProducts = (productsToExport: Product[]) => {
     // CSV headers with all data fields
     const headers = [
       'SKU',
@@ -516,7 +509,7 @@ const Index = () => {
     ];
 
     // Process each product and extract all data
-    const rows = selectedProducts.map(p => {
+    const rows = productsToExport.map(p => {
       // Group compatibility references by type
       const oemRefs = (p.compatibility || [])
         .map(c => c.referencia_oem)
@@ -574,18 +567,192 @@ const Index = () => {
     });
 
     // Build CSV with UTF-8 BOM for Excel compatibility
-    const csvContent = '\uFEFF' + [headers, ...rows]
+    return '\uFEFF' + [headers, ...rows]
       .map(row => row.join(','))
       .join('\n');
+  };
 
+  const downloadCSV = (csvContent: string, filename: string) => {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `productos-vauner-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = filename;
     a.click();
-    
+    window.URL.revokeObjectURL(url);
+  };
+
+  const exportSelected = () => {
+    if (selectedIds.length === 0) {
+      toast.warning('Selecciona al menos un producto para exportar');
+      return;
+    }
+
+    const selectedProducts = products.filter(p => selectedIds.includes(p.id));
+    const csvContent = buildCSVFromProducts(selectedProducts);
+    downloadCSV(csvContent, `productos-vauner-seleccion-${new Date().toISOString().split('T')[0]}.csv`);
     toast.success(`${selectedIds.length} productos exportados con datos completos`);
+  };
+
+  const exportAll = async () => {
+    try {
+      toast.info('Exportando todos los productos...');
+      
+      // Fetch ALL products with compatibility data
+      const { data: allProducts, error: productsError } = await supabase
+        .from('vauner_products')
+        .select('*')
+        .order('sku');
+
+      if (productsError) throw productsError;
+      if (!allProducts || allProducts.length === 0) {
+        toast.warning('No hay productos para exportar');
+        return;
+      }
+
+      // Load pricing config
+      const { data: pricingData } = await supabase
+        .from('pricing_config')
+        .select('*');
+
+      const pricingMap = new Map(
+        (pricingData || []).map(p => [
+          p.category,
+          { margin: p.margin_percentage, vat: p.vat_percentage, shipping: p.shipping_cost }
+        ])
+      );
+
+      // Calculate final prices
+      const productsWithFinalPrice = allProducts.map(product => {
+        const pricing = pricingMap.get(product.category || '');
+        let finalPrice = product.price;
+        if (pricing) {
+          finalPrice = (product.price * (1 + pricing.margin / 100) * (1 + pricing.vat / 100)) + pricing.shipping;
+        }
+        return { ...product, final_price: finalPrice };
+      });
+
+      // Load ALL compatibility data
+      const skus = allProducts.map(p => p.sku);
+      const { data: compatData } = await supabase
+        .from('vehicle_compatibility')
+        .select('*')
+        .in('vauner_sku', skus);
+
+      // Group compatibilities by SKU
+      const compatMap = new Map<string, any[]>();
+      compatData?.forEach(comp => {
+        if (!compatMap.has(comp.vauner_sku)) {
+          compatMap.set(comp.vauner_sku, []);
+        }
+        compatMap.get(comp.vauner_sku)!.push({
+          marca: comp.marca,
+          modelo: comp.modelo,
+          año_desde: comp.año_desde,
+          año_hasta: comp.año_hasta,
+          referencia_oem: comp.referencia_oem,
+          referencia_alkar: comp.referencia_alkar,
+          referencia_jumasa: comp.referencia_jumasa,
+          referencia_geimex: comp.referencia_geimex
+        });
+      });
+
+      const productsWithCompat = productsWithFinalPrice.map(product => ({
+        ...product,
+        compatibility: compatMap.get(product.sku) || []
+      }));
+
+      const csvContent = buildCSVFromProducts(productsWithCompat);
+      downloadCSV(csvContent, `productos-vauner-completo-${new Date().toISOString().split('T')[0]}.csv`);
+      toast.success(`✅ ${productsWithCompat.length} productos exportados (catálogo completo)`);
+    } catch (error: any) {
+      console.error('Error exporting all products:', error);
+      toast.error('Error al exportar: ' + error.message);
+    }
+  };
+
+  const exportByCategory = async () => {
+    if (categoryFilter === 'all') {
+      toast.warning('Selecciona una categoría específica para exportar');
+      return;
+    }
+
+    try {
+      toast.info(`Exportando productos de categoría: ${categoryFilter}...`);
+      
+      // Fetch ALL products from the selected category
+      const { data: categoryProducts, error: productsError } = await supabase
+        .from('vauner_products')
+        .select('*')
+        .eq('category', categoryFilter)
+        .order('sku');
+
+      if (productsError) throw productsError;
+      if (!categoryProducts || categoryProducts.length === 0) {
+        toast.warning('No hay productos en esta categoría');
+        return;
+      }
+
+      // Load pricing config
+      const { data: pricingData } = await supabase
+        .from('pricing_config')
+        .select('*');
+
+      const pricingMap = new Map(
+        (pricingData || []).map(p => [
+          p.category,
+          { margin: p.margin_percentage, vat: p.vat_percentage, shipping: p.shipping_cost }
+        ])
+      );
+
+      // Calculate final prices
+      const productsWithFinalPrice = categoryProducts.map(product => {
+        const pricing = pricingMap.get(product.category || '');
+        let finalPrice = product.price;
+        if (pricing) {
+          finalPrice = (product.price * (1 + pricing.margin / 100) * (1 + pricing.vat / 100)) + pricing.shipping;
+        }
+        return { ...product, final_price: finalPrice };
+      });
+
+      // Load compatibility data
+      const skus = categoryProducts.map(p => p.sku);
+      const { data: compatData } = await supabase
+        .from('vehicle_compatibility')
+        .select('*')
+        .in('vauner_sku', skus);
+
+      // Group compatibilities by SKU
+      const compatMap = new Map<string, any[]>();
+      compatData?.forEach(comp => {
+        if (!compatMap.has(comp.vauner_sku)) {
+          compatMap.set(comp.vauner_sku, []);
+        }
+        compatMap.get(comp.vauner_sku)!.push({
+          marca: comp.marca,
+          modelo: comp.modelo,
+          año_desde: comp.año_desde,
+          año_hasta: comp.año_hasta,
+          referencia_oem: comp.referencia_oem,
+          referencia_alkar: comp.referencia_alkar,
+          referencia_jumasa: comp.referencia_jumasa,
+          referencia_geimex: comp.referencia_geimex
+        });
+      });
+
+      const productsWithCompat = productsWithFinalPrice.map(product => ({
+        ...product,
+        compatibility: compatMap.get(product.sku) || []
+      }));
+
+      const csvContent = buildCSVFromProducts(productsWithCompat);
+      const categorySlug = categoryFilter.toLowerCase().replace(/\s+/g, '-');
+      downloadCSV(csvContent, `productos-vauner-${categorySlug}-${new Date().toISOString().split('T')[0]}.csv`);
+      toast.success(`✅ ${productsWithCompat.length} productos exportados (categoría: ${categoryFilter})`);
+    } catch (error: any) {
+      console.error('Error exporting category products:', error);
+      toast.error('Error al exportar: ' + error.message);
+    }
   };
 
 
@@ -900,7 +1067,22 @@ const Index = () => {
                   disabled={selectedIds.length === 0}
                 >
                   <Download className="mr-2 h-4 w-4" />
-                  Exportar CSV
+                  Exportar Selección
+                </Button>
+                <Button
+                  onClick={exportAll}
+                  variant="outline"
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Exportar Todo
+                </Button>
+                <Button
+                  onClick={exportByCategory}
+                  variant="outline"
+                  disabled={categoryFilter === 'all'}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Exportar Categoría
                 </Button>
                 <Button
                   onClick={exportAmazonFlatFile}
