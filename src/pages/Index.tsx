@@ -446,14 +446,40 @@ const Index = () => {
     setIsProcessingAI(true);
     
     try {
-      toast.info('🤖 Iniciando reprocesamiento FORZADO de productos con OEM...');
+      toast.info('🤖 Calculando productos con OEM a reprocesar...');
+      
+      // Get SKUs with OEM from vehicle_compatibility
+      const { data: oemSkus, error: oemSkusError } = await supabase
+        .from('vehicle_compatibility')
+        .select('vauner_sku')
+        .not('referencia_oem', 'is', null)
+        .neq('referencia_oem', '');
+
+      if (oemSkusError) throw oemSkusError;
+
+      const uniqueOemSkus = [...new Set(oemSkus?.map(x => x.vauner_sku) || [])];
+      
+      // Count how many of these SKUs exist in vauner_products catalog
+      const { count: totalCount, error: countError } = await supabase
+        .from('vauner_products')
+        .select('*', { count: 'exact', head: true })
+        .in('sku', uniqueOemSkus);
+      
+      if (countError) throw countError;
+
+      if (!totalCount || totalCount === 0) {
+        toast.error('No hay productos con OEM en el catálogo para reprocesar');
+        return;
+      }
+
+      toast.info(`🤖 Iniciando reprocesamiento FORZADO de ${totalCount} productos con OEM...`);
       
       const { data: queueData, error: queueError } = await supabase
         .from('processing_queue')
         .insert({
           status: 'pending',
           batch_size: 50,
-          total_count: 0,
+          total_count: totalCount,
           processed_count: 0
         })
         .select()
@@ -470,7 +496,7 @@ const Index = () => {
 
       if (processError) throw processError;
 
-      toast.success('✅ Reprocesamiento iniciado. Se actualizarán todos los productos con OEM.');
+      toast.success(`✅ Reprocesamiento iniciado para ${totalCount} productos. Esto tomará varias horas.`);
       
       setTimeout(() => loadProducts(), 2000);
     } catch (error: any) {
