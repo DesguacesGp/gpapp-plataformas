@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
     const { productIds, queueId, forceReprocess = false } = await req.json()
     console.log(`Processing batch - QueueId: ${queueId}, ForceReprocess: ${forceReprocess}`)
     
-    // CRITICAL: Get SKUs with OEM references from vehicle_compatibility
+    // CRITICAL: Get SKUs with OEM references that exist in both tables
     const { data: skusWithOem, error: oemError } = await supabaseClient
       .from('vehicle_compatibility')
       .select('vauner_sku')
@@ -99,8 +99,22 @@ Deno.serve(async (req) => {
       throw oemError
     }
 
-    const oemSkuList = [...new Set(skusWithOem?.map(x => x.vauner_sku) || [])]
-    console.log(`📋 Found ${oemSkuList.length} unique SKUs with OEM in compatibility table`)
+    const allOemSkus = [...new Set(skusWithOem?.map(x => x.vauner_sku) || [])]
+    
+    // Filter to only SKUs that exist in vauner_products catalog
+    const { data: catalogSkus, error: catalogError } = await supabaseClient
+      .from('vauner_products')
+      .select('sku')
+      .in('sku', allOemSkus)
+    
+    if (catalogError) {
+      console.error('Error fetching catalog SKUs:', catalogError)
+      throw catalogError
+    }
+
+    // CRITICAL: Ordered list of SKUs for deterministic pagination
+    const oemSkuList = catalogSkus?.map(p => p.sku).sort() || []
+    console.log(`📋 Found ${oemSkuList.length} unique SKUs with OEM in compatibility table (ordered alphabetically)`)
 
     // Get next batch of products FROM CATALOG (vauner_products) filtered by OEM
     let productsToProcess = productIds
@@ -119,28 +133,55 @@ Deno.serve(async (req) => {
       offset = currentQueue?.processed_count || 0
       console.log(`📍 Continuing from queue ${queueId} with offset: ${offset} products already processed`)
       
-      // Build query: select from catalog using id ordering and offset
-      // CRITICAL: Order ONLY by id to ensure consistent pagination
-      let query = supabaseClient
-        .from('vauner_products')
-        .select('id')
-        .in('sku', oemSkuList)
-        .order('id', { ascending: true })
+      // CRITICAL: Use direct array slicing for deterministic pagination
+      const batchSize = 25
+      const startIdx = offset
+      const endIdx = Math.min(offset + batchSize, oemSkuList.length)
+      const skuBatch = oemSkuList.slice(startIdx, endIdx)
       
-      // If NOT force reprocess, filter only products without translated_title
-      if (!forceReprocess) {
-        query = query.is('translated_title', null)
+      console.log(`📦 Processing SKUs from index ${startIdx} to ${endIdx - 1} (${skuBatch.length} SKUs)`)
+      console.log(`📊 Total SKUs with OEM in ordered queue: ${oemSkuList.length}`)
+      
+      if (skuBatch.length === 0) {
+        console.log('✅ No more SKUs to process - batch complete')
+        
+        // Mark queue as completed
+        const { error: completeError } = await supabaseClient
+          .from('processing_queue')
+          .update({ 
+            status: 'completed',
+            completed_at: new Date().toISOString()
+          })
+          .eq('id', queueId)
+        
+        if (completeError) {
+          console.error('Error marking queue as completed:', completeError)
+        }
+        
+        return new Response(
+          JSON.stringify({ 
+            message: 'Processing complete',
+            processed: offset,
+            total: oemSkuList.length 
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
       }
       
-      // Apply offset and limit using range
-      const batchSize = 10 // TEMPORARY: Reduced for testing 2 batches
-      query = query.range(offset, offset + batchSize - 1)
+      // Fetch products for this SKU batch
+      const { data: productsData, error: queryError } = await supabaseClient
+        .from('vauner_products')
+        .select('id, sku, description, raw_data, category, price')
+        .in('sku', skuBatch)
       
-      const { data: nextBatch } = await query
+      if (queryError) {
+        console.error('Error fetching products:', queryError)
+        throw queryError
+      }
       
-      productsToProcess = nextBatch?.map(p => p.id) || []
-      console.log(`📦 Batch range: offset ${offset} to ${offset + productsToProcess.length - 1}, processing ${productsToProcess.length} products`)
-      console.log(`📊 Total catalog with OEM: ${oemSkuList.length} products`)
+      productsToProcess = productsData || []
+      console.log(`✅ Found ${productsToProcess.length} products in catalog for this SKU batch`)
+      
       if (forceReprocess) {
         console.log(`🔄 FORCE REPROCESS MODE - Will update all ${oemSkuList.length} catalog products with OEM`)
       }
@@ -589,7 +630,7 @@ Stock: ${product.stock}${compatibilityPrompt}`
             .from('processing_queue')
             .insert({
               status: 'pending',
-              batch_size: 10, // TEMPORARY: Matching test batch size
+              batch_size: 25,
               total_count: remainingCount,
               processed_count: absoluteCount // CRITICAL: Use absolute count as offset for next batch
             })

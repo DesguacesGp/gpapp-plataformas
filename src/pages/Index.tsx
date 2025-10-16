@@ -427,37 +427,79 @@ const Index = () => {
     setIsProcessingAI(true);
     
     try {
-      toast.info('🤖 Iniciando reprocesamiento de productos con OEM...');
+      toast.info('🤖 Verificando estado del reprocesamiento...');
       
-      // Create queue entry - edge function will calculate total
-      const { data: queueData, error: queueError } = await supabase
+      // Check for existing queue that is not in error state
+      const { data: existingQueues } = await supabase
         .from('processing_queue')
-        .insert({
-          status: 'pending',
-          batch_size: 50,
-          total_count: 0,
-          processed_count: 0
-        })
-        .select()
-        .single();
+        .select('*')
+        .in('status', ['pending', 'processing', 'completed'])
+        .order('created_at', { ascending: false })
+        .limit(1);
+      
+      let queueToUse = existingQueues?.[0];
+      
+      if (queueToUse && queueToUse.status === 'completed') {
+        // Last queue is completed, ask if user wants to reprocess everything
+        const restart = confirm(
+          '✅ El reprocesamiento anterior se completó.\n\n' +
+          '¿Quieres reprocesar TODOS los productos de nuevo?\n\n' +
+          '- OK: Reprocesar todo desde el principio\n' +
+          '- Cancelar: No hacer nada'
+        );
+        
+        if (!restart) {
+          toast.info('Reprocesamiento cancelado');
+          setIsProcessingAI(false);
+          return;
+        }
+        
+        // Create new queue to reprocess everything
+        queueToUse = null;
+      }
+      
+      if (!queueToUse) {
+        // No active queue, create a new one
+        toast.info('🆕 Creando nueva cola de procesamiento...');
+        
+        const { data: queueData, error: queueError } = await supabase
+          .from('processing_queue')
+          .insert({
+            status: 'pending',
+            batch_size: 25,
+            total_count: 0,
+            processed_count: 0
+          })
+          .select()
+          .single();
 
-      if (queueError) throw queueError;
+        if (queueError) throw queueError;
+        queueToUse = queueData;
+        
+        toast.success('✅ Nueva cola creada - iniciando desde el principio');
+      } else {
+        // There's an active queue, continue from where it left off
+        toast.success(
+          `🔄 Continuando procesamiento existente...\n` +
+          `Progreso: ${queueToUse.processed_count} productos procesados`
+        );
+      }
 
-      // Call edge function with forceReprocess: true
-      // Edge function will:
-      // 1. Find SKUs with OEM in vehicle_compatibility
-      // 2. Filter only those in vauner_products catalog
-      // 3. Process them in batches with forceReprocess: true
+      // Invoke edge function with the queue (new or existing)
       const { error: processError } = await supabase.functions.invoke('process-products', {
         body: { 
-          queueId: queueData.id,
+          queueId: queueToUse.id,
           forceReprocess: true
         }
       });
 
       if (processError) throw processError;
 
-      toast.success('✅ Reprocesamiento iniciado. Se procesarán todos los productos con OEM del catálogo.');
+      toast.success(
+        queueToUse.processed_count > 0
+          ? `✅ Reprocesamiento continuado desde producto ${queueToUse.processed_count}`
+          : '✅ Reprocesamiento iniciado desde el principio'
+      );
       
       setTimeout(() => loadProducts(), 2000);
     } catch (error: any) {
