@@ -510,26 +510,30 @@ const Index = () => {
 
     // Process each product and extract all data
     const rows = productsToExport.map(p => {
-      // Group compatibility references by type
-      const oemRefs = (p.compatibility || [])
-        .map(c => c.referencia_oem)
-        .filter(ref => ref !== null && ref !== undefined)
-        .join(', ');
+      // Group compatibility references by type - eliminate duplicates with Set
+      const oemRefs = [...new Set(
+        (p.compatibility || [])
+          .map(c => c.referencia_oem)
+          .filter(ref => ref !== null && ref !== undefined)
+      )].join(', ');
 
-      const alkarRefs = (p.compatibility || [])
-        .map(c => c.referencia_alkar)
-        .filter(ref => ref !== null && ref !== undefined)
-        .join(', ');
+      const alkarRefs = [...new Set(
+        (p.compatibility || [])
+          .map(c => c.referencia_alkar)
+          .filter(ref => ref !== null && ref !== undefined)
+      )].join(', ');
 
-      const jumasaRefs = (p.compatibility || [])
-        .map(c => c.referencia_jumasa)
-        .filter(ref => ref !== null && ref !== undefined)
-        .join(', ');
+      const jumasaRefs = [...new Set(
+        (p.compatibility || [])
+          .map(c => c.referencia_jumasa)
+          .filter(ref => ref !== null && ref !== undefined)
+      )].join(', ');
 
-      const geimexRefs = (p.compatibility || [])
-        .map(c => c.referencia_geimex)
-        .filter(ref => ref !== null && ref !== undefined)
-        .join(', ');
+      const geimexRefs = [...new Set(
+        (p.compatibility || [])
+          .map(c => c.referencia_geimex)
+          .filter(ref => ref !== null && ref !== undefined)
+      )].join(', ');
 
       // Extract individual bullet points (up to 5)
       const bullets = p.bullet_points || [];
