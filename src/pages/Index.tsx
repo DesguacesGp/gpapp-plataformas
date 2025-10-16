@@ -598,13 +598,33 @@ const Index = () => {
     try {
       toast.info('Exportando todos los productos...');
       
-      // Fetch ALL products with compatibility data
-      const { data: allProducts, error: productsError } = await supabase
-        .from('vauner_products')
-        .select('*')
-        .order('sku');
+      // Fetch ALL products with compatibility data using pagination
+      let allProducts: any[] = [];
+      let offset = 0;
+      const batchSize = 1000;
+      let hasMore = true;
 
-      if (productsError) throw productsError;
+      while (hasMore) {
+        const { data: batch, error: batchError } = await supabase
+          .from('vauner_products')
+          .select('*')
+          .order('sku')
+          .range(offset, offset + batchSize - 1);
+
+        if (batchError) throw batchError;
+        if (!batch || batch.length === 0) break;
+        
+        allProducts = [...allProducts, ...batch];
+        hasMore = batch.length === batchSize;
+        offset += batchSize;
+        
+        if (allProducts.length % 2000 === 0) {
+          toast.info(`Cargando productos: ${allProducts.length}...`);
+        }
+      }
+
+      toast.info(`✅ ${allProducts.length} productos cargados, procesando...`);
+
       if (!allProducts || allProducts.length === 0) {
         toast.warning('No hay productos para exportar');
         return;
@@ -618,17 +638,32 @@ const Index = () => {
       const pricingMap = new Map(
         (pricingData || []).map(p => [
           p.category,
-          { margin: p.margin_percentage, vat: p.vat_percentage, shipping: p.shipping_cost }
+          { 
+            margin: Number(p.margin_percentage), 
+            vat: Number(p.vat_percentage), 
+            shipping: Number(p.shipping_cost) 
+          }
         ])
       );
 
-      // Calculate final prices
+      // Calculate final prices with proper type conversion
       const productsWithFinalPrice = allProducts.map(product => {
         const pricing = pricingMap.get(product.category || '');
-        let finalPrice = product.price;
+        let finalPrice = Number(product.price);
+        
         if (pricing) {
-          finalPrice = (product.price * (1 + pricing.margin / 100) * (1 + pricing.vat / 100)) + pricing.shipping;
+          const basePrice = Number(product.price);
+          const margin = Number(pricing.margin);
+          const vat = Number(pricing.vat);
+          const shipping = Number(pricing.shipping);
+          
+          // Calcular: precio * (1 + margen%) * (1 + IVA%) + envío
+          finalPrice = (basePrice * (1 + margin / 100) * (1 + vat / 100)) + shipping;
+          
+          // Redondear a 2 decimales
+          finalPrice = Math.round(finalPrice * 100) / 100;
         }
+        
         return { ...product, final_price: finalPrice };
       });
 
@@ -680,14 +715,34 @@ const Index = () => {
     try {
       toast.info(`Exportando productos de categoría: ${categoryFilter}...`);
       
-      // Fetch ALL products from the selected category
-      const { data: categoryProducts, error: productsError } = await supabase
-        .from('vauner_products')
-        .select('*')
-        .eq('category', categoryFilter)
-        .order('sku');
+      // Fetch ALL products from the selected category using pagination
+      let categoryProducts: any[] = [];
+      let offset = 0;
+      const batchSize = 1000;
+      let hasMore = true;
 
-      if (productsError) throw productsError;
+      while (hasMore) {
+        const { data: batch, error: batchError } = await supabase
+          .from('vauner_products')
+          .select('*')
+          .eq('category', categoryFilter)
+          .order('sku')
+          .range(offset, offset + batchSize - 1);
+
+        if (batchError) throw batchError;
+        if (!batch || batch.length === 0) break;
+        
+        categoryProducts = [...categoryProducts, ...batch];
+        hasMore = batch.length === batchSize;
+        offset += batchSize;
+        
+        if (categoryProducts.length % 2000 === 0) {
+          toast.info(`Cargando productos: ${categoryProducts.length}...`);
+        }
+      }
+
+      toast.info(`✅ ${categoryProducts.length} productos cargados, procesando...`);
+
       if (!categoryProducts || categoryProducts.length === 0) {
         toast.warning('No hay productos en esta categoría');
         return;
@@ -701,17 +756,32 @@ const Index = () => {
       const pricingMap = new Map(
         (pricingData || []).map(p => [
           p.category,
-          { margin: p.margin_percentage, vat: p.vat_percentage, shipping: p.shipping_cost }
+          { 
+            margin: Number(p.margin_percentage), 
+            vat: Number(p.vat_percentage), 
+            shipping: Number(p.shipping_cost) 
+          }
         ])
       );
 
-      // Calculate final prices
+      // Calculate final prices with proper type conversion
       const productsWithFinalPrice = categoryProducts.map(product => {
         const pricing = pricingMap.get(product.category || '');
-        let finalPrice = product.price;
+        let finalPrice = Number(product.price);
+        
         if (pricing) {
-          finalPrice = (product.price * (1 + pricing.margin / 100) * (1 + pricing.vat / 100)) + pricing.shipping;
+          const basePrice = Number(product.price);
+          const margin = Number(pricing.margin);
+          const vat = Number(pricing.vat);
+          const shipping = Number(pricing.shipping);
+          
+          // Calcular: precio * (1 + margen%) * (1 + IVA%) + envío
+          finalPrice = (basePrice * (1 + margin / 100) * (1 + vat / 100)) + shipping;
+          
+          // Redondear a 2 decimales
+          finalPrice = Math.round(finalPrice * 100) / 100;
         }
+        
         return { ...product, final_price: finalPrice };
       });
 
