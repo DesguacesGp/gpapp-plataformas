@@ -105,13 +105,39 @@ Deno.serve(async (req) => {
     // Get next batch of products FROM CATALOG (vauner_products) filtered by OEM
     let productsToProcess = productIds
     if (!productsToProcess && queueId) {
+      // Get last_product_id from current queue to continue from where we left off
+      let lastProcessedId = null
+      const { data: currentQueue } = await supabaseClient
+        .from('processing_queue')
+        .select('last_product_id')
+        .eq('id', queueId)
+        .single()
+      
+      lastProcessedId = currentQueue?.last_product_id
+      if (lastProcessedId) {
+        console.log(`📍 Continuing from last processed ID: ${lastProcessedId}`)
+      }
+      
       // Build query: select from catalog, only products that have OEM in compatibility
       let query = supabaseClient
         .from('vauner_products')
-        .select('id')
+        .select('id, created_at')
         .in('sku', oemSkuList)
         .order('created_at', { ascending: true })
         .limit(50)
+      
+      // If we have last_product_id, filter products created after it
+      if (lastProcessedId) {
+        const { data: lastProduct } = await supabaseClient
+          .from('vauner_products')
+          .select('created_at')
+          .eq('id', lastProcessedId)
+          .single()
+        
+        if (lastProduct) {
+          query = query.gt('created_at', lastProduct.created_at)
+        }
+      }
       
       // If NOT force reprocess, filter only products without translated_title
       if (!forceReprocess) {
@@ -523,6 +549,12 @@ Stock: ${product.stock}${compatibilityPrompt}`
         // Stop heartbeat
         stopHeartbeat()
         
+        // Get the last product ID from the current batch for continuation
+        let lastProductInBatch = null
+        if (productsToProcess && productsToProcess.length > 0) {
+          lastProductInBatch = productsToProcess[productsToProcess.length - 1]
+        }
+        
         // Update current queue entry
         if (queueId) {
           await supabaseClient
@@ -530,9 +562,14 @@ Stock: ${product.stock}${compatibilityPrompt}`
             .update({ 
               status: 'completed',
               processed_count: processedCount.success,
-              completed_at: new Date().toISOString()
+              completed_at: new Date().toISOString(),
+              last_product_id: lastProductInBatch
             })
             .eq('id', queueId)
+          
+          if (lastProductInBatch) {
+            console.log(`✅ Saved progress - Last product ID: ${lastProductInBatch}`)
+          }
         }
         
         // If there are more products, create a new queue entry AND trigger processing immediately
@@ -544,7 +581,8 @@ Stock: ${product.stock}${compatibilityPrompt}`
             .insert({
               status: 'pending',
               batch_size: 50,
-              total_count: remainingCount
+              total_count: remainingCount,
+              last_product_id: lastProductInBatch
             })
             .select()
             .single()
