@@ -343,6 +343,9 @@ export const ProductsTable = ({
               <TableHead className="text-center">
                 Imagen 3
               </TableHead>
+              <TableHead className="text-center">
+                Imagen 4
+              </TableHead>
               <TableHead className="w-24">
                 <SortButton field="category">Categoría</SortButton>
               </TableHead>
@@ -351,7 +354,7 @@ export const ProductsTable = ({
           <TableBody>
             {products.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={19} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={20} className="text-center py-8 text-muted-foreground">
                   No hay productos que mostrar
                 </TableCell>
               </TableRow>
@@ -587,6 +590,16 @@ export const ProductsTable = ({
                   <TableCell className="text-center">
                     <a
                       href="/images/recambify-branding.png"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      Ver imagen
+                    </a>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <a
+                      href="/images/recambify_compatibilidad.jpg"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-xs text-blue-600 hover:underline"
