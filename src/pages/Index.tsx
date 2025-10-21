@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { RefreshCw, Settings, Download, LogOut, Sparkles, DollarSign, Package, Image as ImageIcon, Table } from "lucide-react";
+import { RefreshCw, Settings, Download, LogOut, Sparkles, DollarSign, Package, Image as ImageIcon } from "lucide-react";
 import { ProductsTable } from "@/components/ProductsTable";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -45,7 +45,6 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isProcessingImages, setIsProcessingImages] = useState(false);
-  const [isGeneratingTables, setIsGeneratingTables] = useState(false);
   const [isProcessingAI, setIsProcessingAI] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   
@@ -353,75 +352,6 @@ const Index = () => {
     }
   };
 
-  const generateCompatibilityTables = async () => {
-    setIsGeneratingTables(true);
-    
-    try {
-      toast.info('📊 Generando tablas de compatibilidad...');
-      
-      const { data: productsNeedingCompatImage, error: compatError } = await supabase
-        .from('vauner_products')
-        .select('id, sku')
-        .is('compatibility_image_url', null)
-        .not('marca', 'is', null);
-
-      if (compatError) {
-        console.error('Error fetching products needing compat images:', compatError);
-        toast.error('Error al buscar productos sin tabla de compatibilidad');
-      } else if (productsNeedingCompatImage && productsNeedingCompatImage.length > 0) {
-        console.log(`📊 Found ${productsNeedingCompatImage.length} products needing compatibility images`);
-        toast.info(`📊 Generando ${productsNeedingCompatImage.length} tablas de compatibilidad...`);
-        
-        let compatImagesGenerated = 0;
-        let compatImagesFailed = 0;
-        
-        const compatBatchSize = 10;
-        for (let i = 0; i < productsNeedingCompatImage.length; i += compatBatchSize) {
-          const batch = productsNeedingCompatImage.slice(i, i + compatBatchSize);
-          
-          await Promise.all(
-            batch.map(async (product) => {
-              try {
-                const { error: genError } = await supabase.functions.invoke('generate-compatibility-image', {
-                  body: { productId: product.id }
-                });
-                
-                if (genError) {
-                  console.error(`Failed to generate compat image for ${product.sku}:`, genError);
-                  compatImagesFailed++;
-                } else {
-                  compatImagesGenerated++;
-                  console.log(`✅ Generated compat image ${compatImagesGenerated}/${productsNeedingCompatImage.length}`);
-                }
-              } catch (error) {
-                console.error(`Error generating compat image for ${product.sku}:`, error);
-                compatImagesFailed++;
-              }
-            })
-          );
-          
-          if (i + compatBatchSize < productsNeedingCompatImage.length) {
-            toast.info(`📊 Generadas ${compatImagesGenerated}/${productsNeedingCompatImage.length} tablas...`);
-          }
-          
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-        
-        if (compatImagesGenerated > 0) {
-          toast.success(`✅ ${compatImagesGenerated} tablas de compatibilidad generadas${compatImagesFailed > 0 ? `, ${compatImagesFailed} fallaron` : ''}`);
-        }
-      } else {
-        toast.info('ℹ️ No hay tablas de compatibilidad pendientes de generar');
-      }
-      
-      setTimeout(() => loadProducts(), 2000);
-    } catch (error: any) {
-      console.error('Error generating compatibility tables:', error);
-      toast.error('Error: ' + error.message);
-    } finally {
-      setIsGeneratingTables(false);
-    }
-  };
 
   const processWithAI = async () => {
     setIsProcessingAI(true);
@@ -1149,7 +1079,7 @@ const Index = () => {
                 <Button
                   onClick={syncFromVauner}
                   variant="outline"
-                  disabled={isSyncing || isProcessingImages || isGeneratingTables || isProcessingAI}
+                  disabled={isSyncing || isProcessingImages || isProcessingAI}
                   size="lg"
                 >
                   <RefreshCw className={`mr-2 h-5 w-5 ${isSyncing ? 'animate-spin' : ''}`} />
@@ -1165,18 +1095,6 @@ const Index = () => {
                   {isProcessingImages 
                     ? 'Procesando Imágenes...' 
                     : `🖼️ Procesar Imágenes (${imageStats.pending} pendientes)`
-                  }
-                </Button>
-                <Button
-                  onClick={generateCompatibilityTables}
-                  variant="outline"
-                  disabled={isGeneratingTables || isSyncing}
-                  size="lg"
-                >
-                  <Table className={`mr-2 h-5 w-5 ${isGeneratingTables ? 'animate-pulse' : ''}`} />
-                  {isGeneratingTables 
-                    ? 'Generando Tablas...' 
-                    : `📊 Generar Tablas`
                   }
                 </Button>
                 <Button
