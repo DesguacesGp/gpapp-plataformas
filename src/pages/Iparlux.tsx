@@ -8,6 +8,8 @@ import { supabase } from "@/integrations/supabase/client";
 const Iparlux = () => {
   const [isSyncingStock, setIsSyncingStock] = useState(false);
   const [isSyncingCatalog, setIsSyncingCatalog] = useState(false);
+  const [isTestingFTP, setIsTestingFTP] = useState(false);
+  const [isTestingMySQL, setIsTestingMySQL] = useState(false);
   const [stats, setStats] = useState({
     total: 0,
     withImages: 0,
@@ -59,7 +61,7 @@ const Iparlux = () => {
 
   const handleCatalogSync = async () => {
     setIsSyncingCatalog(true);
-    toast.info("Conectando con catálogo MySQL...");
+    toast.info("Sincronizando catálogo desde MySQL...");
     
     try {
       const { data, error } = await supabase.functions.invoke('iparlux-catalog-sync', {
@@ -68,20 +70,69 @@ const Iparlux = () => {
 
       if (error) throw error;
 
-      if (data?.success === false) {
-        toast.warning(data.message, {
-          duration: 8000,
-          description: "Usa 'Actualizar Stock FTP' mientras tanto"
-        });
-      } else {
-        toast.success(data?.message || "Catálogo sincronizado correctamente");
+      if (data?.success) {
+        toast.success(data.message || "Catálogo sincronizado correctamente");
         await loadStats();
+      } else {
+        toast.error(data?.message || "Error al sincronizar catálogo");
       }
     } catch (error: any) {
       console.error('Catalog sync error:', error);
       toast.error("Error al conectar con MySQL: " + error.message);
     } finally {
       setIsSyncingCatalog(false);
+    }
+  };
+
+  const handleTestFTP = async () => {
+    setIsTestingFTP(true);
+    toast.info("Probando conexión FTP...");
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('iparlux-ftp-test', {
+        body: {}
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        toast.success(data.message, {
+          description: `Archivos disponibles: ${data.files?.join(', ')}`
+        });
+      } else {
+        toast.error(data?.message || "Error en test FTP");
+      }
+    } catch (error: any) {
+      console.error('FTP test error:', error);
+      toast.error("Error al probar FTP: " + error.message);
+    } finally {
+      setIsTestingFTP(false);
+    }
+  };
+
+  const handleTestMySQL = async () => {
+    setIsTestingMySQL(true);
+    toast.info("Probando conexión MySQL...");
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('iparlux-catalog-sync', {
+        body: { action: 'test_connection' }
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        toast.success(data.message, {
+          description: `Tablas disponibles: ${data.tables?.join(', ')}`
+        });
+      } else {
+        toast.error(data?.message || "Error en test MySQL");
+      }
+    } catch (error: any) {
+      console.error('MySQL test error:', error);
+      toast.error("Error al probar MySQL: " + error.message);
+    } finally {
+      setIsTestingMySQL(false);
     }
   };
 
@@ -139,9 +190,39 @@ const Iparlux = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Acciones</CardTitle>
+          <CardTitle>Pruebas de Conexión</CardTitle>
           <CardDescription>
-            Operaciones disponibles para el catálogo de Iparlux
+            Verifica que las conexiones FTP y MySQL funcionen correctamente
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          <Button
+            onClick={handleTestFTP}
+            disabled={isTestingFTP}
+            variant="outline"
+            className="gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${isTestingFTP ? "animate-spin" : ""}`} />
+            Probar FTP
+          </Button>
+
+          <Button
+            onClick={handleTestMySQL}
+            disabled={isTestingMySQL}
+            variant="outline"
+            className="gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${isTestingMySQL ? "animate-spin" : ""}`} />
+            Probar MySQL
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Sincronizaciones</CardTitle>
+          <CardDescription>
+            Actualiza el stock desde FTP o importa el catálogo completo desde MySQL
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -163,11 +244,6 @@ const Iparlux = () => {
             >
               <Download className={`h-4 w-4 ${isSyncingCatalog ? "animate-spin" : ""}`} />
               Sincronizar Catálogo (MySQL)
-            </Button>
-
-            <Button variant="outline" className="gap-2" disabled>
-              <Download className="h-4 w-4" />
-              Exportar a Excel
             </Button>
           </div>
 
