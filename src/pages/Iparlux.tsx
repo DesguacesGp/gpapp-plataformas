@@ -1,21 +1,58 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RefreshCw, Download, Package } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const Iparlux = () => {
   const [isSyncing, setIsSyncing] = useState(false);
+  const [stats, setStats] = useState({
+    total: 0,
+    withImages: 0,
+    processed: 0
+  });
+
+  useEffect(() => {
+    loadStats();
+  }, []);
+
+  const loadStats = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('iparlux_products')
+        .select('has_image, processed_image_url');
+      
+      if (error) throw error;
+
+      const total = data?.length || 0;
+      const withImages = data?.filter(p => p.has_image).length || 0;
+      const processed = data?.filter(p => p.processed_image_url).length || 0;
+      
+      setStats({ total, withImages, processed });
+    } catch (error) {
+      console.error('Error loading stats:', error);
+    }
+  };
 
   const handleSync = async () => {
     setIsSyncing(true);
-    toast.info("Sincronizando catálogo de Iparlux...");
+    toast.info("Conectando al FTP de Iparlux...");
     
     try {
-      // TODO: Implementar sincronización con FTP de Iparlux
-      toast.success("Funcionalidad en desarrollo");
+      const { data, error } = await supabase.functions.invoke('iparlux-sync', {
+        body: { action: 'sync_catalog' }
+      });
+
+      if (error) throw error;
+
+      toast.success(data.message || "Catálogo sincronizado correctamente");
+      
+      // Reload statistics
+      await loadStats();
     } catch (error: any) {
-      toast.error("Error: " + error.message);
+      console.error('Sync error:', error);
+      toast.error("Error al sincronizar: " + error.message);
     } finally {
       setIsSyncing(false);
     }
@@ -39,9 +76,9 @@ const Iparlux = () => {
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">-</div>
+            <div className="text-2xl font-bold">{stats.total.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              Próximamente
+              productos en catálogo
             </p>
           </CardContent>
         </Card>
@@ -52,9 +89,9 @@ const Iparlux = () => {
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">-</div>
+            <div className="text-2xl font-bold">{stats.withImages.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              Próximamente
+              con URLs de imágenes
             </p>
           </CardContent>
         </Card>
@@ -65,9 +102,9 @@ const Iparlux = () => {
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">-</div>
+            <div className="text-2xl font-bold">{stats.processed.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              Próximamente
+              imágenes procesadas
             </p>
           </CardContent>
         </Card>

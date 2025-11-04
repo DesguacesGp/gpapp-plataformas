@@ -148,6 +148,69 @@ export type Database = {
         }
         Relationships: []
       }
+      iparlux_products: {
+        Row: {
+          año_desde: string | null
+          año_hasta: string | null
+          category: string | null
+          created_at: string
+          description: string
+          has_image: boolean
+          id: string
+          image_gif_url: string | null
+          image_jpg_url: string | null
+          marca: string | null
+          modelo: string | null
+          price: number
+          processed_image_url: string | null
+          raw_data: Json | null
+          referencia: string | null
+          sku: string
+          stock: number
+          updated_at: string
+        }
+        Insert: {
+          año_desde?: string | null
+          año_hasta?: string | null
+          category?: string | null
+          created_at?: string
+          description: string
+          has_image?: boolean
+          id?: string
+          image_gif_url?: string | null
+          image_jpg_url?: string | null
+          marca?: string | null
+          modelo?: string | null
+          price: number
+          processed_image_url?: string | null
+          raw_data?: Json | null
+          referencia?: string | null
+          sku: string
+          stock?: number
+          updated_at?: string
+        }
+        Update: {
+          año_desde?: string | null
+          año_hasta?: string | null
+          category?: string | null
+          created_at?: string
+          description?: string
+          has_image?: boolean
+          id?: string
+          image_gif_url?: string | null
+          image_jpg_url?: string | null
+          marca?: string | null
+          modelo?: string | null
+          price?: number
+          processed_image_url?: string | null
+          raw_data?: Json | null
+          referencia?: string | null
+          sku?: string
+          stock?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       model_equivalences: {
         Row: {
           confidence_level: string
@@ -477,7 +540,7 @@ export type Database = {
     }
     Functions: {
       get_image_statistics: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           none_count: number
           pending_count: number
