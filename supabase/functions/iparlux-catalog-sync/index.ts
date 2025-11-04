@@ -115,24 +115,30 @@ Deno.serve(async (req) => {
         console.log(`✅ Using confirmed table: ${productsTable}`);
 
         // Get table structure
+        console.log('📋 Exploring table structure...');
         const structureResult = await mysqlClient.query(`DESCRIBE ${productsTable}`);
-        console.log('📋 Table structure:', structureResult);
+        console.log('📋 Table structure:', JSON.stringify(structureResult, null, 2));
+
+        // Fetch sample products first
+        console.log('📦 Fetching sample products (10)...');
+        const sampleResult = await mysqlClient.query(`SELECT * FROM ${productsTable} LIMIT 10`);
+        console.log('📦 Sample products:', JSON.stringify(sampleResult, null, 2));
 
         // Fetch products (limit to 1000 for initial test)
         console.log('📥 Fetching products from MySQL...');
         const productsResult = await mysqlClient.query(`SELECT * FROM ${productsTable} LIMIT 1000`);
         
-        if (!productsResult.rows || productsResult.rows.length === 0) {
+        if (!productsResult || productsResult.length === 0) {
           throw new Error('No products found in MySQL table');
         }
 
-        console.log(`✅ Retrieved ${productsResult.rows.length} products from MySQL`);
+        console.log(`✅ Retrieved ${productsResult.length} products from MySQL`);
 
         // Transform MySQL data to our format
         const products: IparluxProduct[] = [];
         let skipped = 0;
 
-        for (const row of productsResult.rows) {
+        for (const row of productsResult) {
           try {
             // Map fields (adjust based on actual column names)
             const sku = row.referencia || row.codigo || row.sku || row.id;
