@@ -128,9 +128,15 @@ Deno.serve(async (req) => {
         console.log('📦 Sample result keys:', Object.keys(sampleResult || {}));
         console.log('📦 Sample products:', JSON.stringify(sampleResult, null, 2));
 
-        // Fetch products (limit to 1000 for initial test)
-        console.log('📥 Fetching products from MySQL...');
-        const productsResult = await mysqlClient.query(`SELECT * FROM ${productsTable} LIMIT 1000`);
+        // Count total products
+        console.log('📊 Counting total products...');
+        const countResult = await mysqlClient.query(`SELECT COUNT(*) as total FROM ${productsTable}`);
+        const totalProducts = countResult[0]?.total || 0;
+        console.log(`📊 Total products in MySQL: ${totalProducts}`);
+
+        // Fetch ALL products from MySQL
+        console.log('📥 Fetching ALL products from MySQL...');
+        const productsResult = await mysqlClient.query(`SELECT * FROM ${productsTable}`);
         console.log('📊 Products result type:', typeof productsResult, 'isArray:', Array.isArray(productsResult));
         console.log('📊 Products result length:', productsResult?.length);
         console.log('📊 Products result keys:', Object.keys(productsResult || {}));
