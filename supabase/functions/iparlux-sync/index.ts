@@ -25,30 +25,40 @@ async function ftpConnect(host: string, user: string, password: string): Promise
   
   // Read welcome message
   const welcomeBuffer = new Uint8Array(1024);
-  await conn.read(welcomeBuffer);
-  const welcome = new TextDecoder().decode(welcomeBuffer);
-  console.log('📨 Server welcome:', welcome.substring(0, 100));
+  const welcomeLen = await conn.read(welcomeBuffer);
+  const welcome = new TextDecoder().decode(welcomeBuffer.subarray(0, welcomeLen || 0));
+  console.log('📨 Server welcome:', welcome.trim());
+  
+  if (!welcome.includes('220')) {
+    throw new Error(`FTP server did not send welcome message: ${welcome}`);
+  }
   
   // Send USER command
   const userCmd = `USER ${user}\r\n`;
   await conn.write(new TextEncoder().encode(userCmd));
+  console.log(`📤 Sent: USER ${user}`);
   
   const userBuffer = new Uint8Array(1024);
-  await conn.read(userBuffer);
-  const userResponse = new TextDecoder().decode(userBuffer);
-  console.log('📨 USER response:', userResponse.substring(0, 100));
+  const userLen = await conn.read(userBuffer);
+  const userResponse = new TextDecoder().decode(userBuffer.subarray(0, userLen || 0));
+  console.log('📨 USER response:', userResponse.trim());
+  
+  if (!userResponse.includes('331')) {
+    throw new Error(`FTP USER command failed: ${userResponse.trim()}`);
+  }
   
   // Send PASS command
   const passCmd = `PASS ${password}\r\n`;
   await conn.write(new TextEncoder().encode(passCmd));
+  console.log('📤 Sent: PASS ******');
   
   const passBuffer = new Uint8Array(1024);
-  await conn.read(passBuffer);
-  const passResponse = new TextDecoder().decode(passBuffer);
-  console.log('📨 PASS response:', passResponse.substring(0, 100));
+  const passLen = await conn.read(passBuffer);
+  const passResponse = new TextDecoder().decode(passBuffer.subarray(0, passLen || 0));
+  console.log('📨 PASS response:', passResponse.trim());
   
   if (!passResponse.includes('230')) {
-    throw new Error(`FTP login failed: ${passResponse}`);
+    throw new Error(`FTP login failed: ${passResponse.trim()}`);
   }
   
   console.log('✅ FTP authentication successful');
@@ -201,7 +211,14 @@ Deno.serve(async (req) => {
       const ftpPassword = Deno.env.get('IPARLUX_FTP_PASSWORD') || '';
       const imageBaseUrl = Deno.env.get('IPARLUX_IMAGE_BASE_URL') || 'http://www.iparlux.es/imagenes/catalogo';
 
-      console.log(`📡 Connecting to FTP: ${ftpHost} as user: ${ftpUser}`);
+      // Validate credentials
+      if (!ftpUser || !ftpPassword) {
+        throw new Error('FTP credentials not configured. Please check IPARLUX_FTP_USER and IPARLUX_FTP_PASSWORD secrets.');
+      }
+
+      console.log(`📡 Connecting to FTP: ${ftpHost}`);
+      console.log(`👤 User: ${ftpUser} (length: ${ftpUser.length})`);
+      console.log(`🔑 Password configured: ${ftpPassword ? 'Yes' : 'No'} (length: ${ftpPassword.length})`);
 
       let conn: Deno.Conn | null = null;
       
