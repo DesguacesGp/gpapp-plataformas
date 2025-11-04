@@ -118,27 +118,42 @@ Deno.serve(async (req) => {
         console.log('📋 Exploring table structure...');
         const structureResult = await mysqlClient.query(`DESCRIBE ${productsTable}`);
         console.log('📋 Table structure:', JSON.stringify(structureResult, null, 2));
+        console.log('📋 Structure type:', typeof structureResult, 'isArray:', Array.isArray(structureResult));
 
         // Fetch sample products first
         console.log('📦 Fetching sample products (10)...');
         const sampleResult = await mysqlClient.query(`SELECT * FROM ${productsTable} LIMIT 10`);
+        console.log('📦 Sample result type:', typeof sampleResult, 'isArray:', Array.isArray(sampleResult));
+        console.log('📦 Sample result length:', sampleResult?.length);
+        console.log('📦 Sample result keys:', Object.keys(sampleResult || {}));
         console.log('📦 Sample products:', JSON.stringify(sampleResult, null, 2));
 
         // Fetch products (limit to 1000 for initial test)
         console.log('📥 Fetching products from MySQL...');
         const productsResult = await mysqlClient.query(`SELECT * FROM ${productsTable} LIMIT 1000`);
+        console.log('📊 Products result type:', typeof productsResult, 'isArray:', Array.isArray(productsResult));
+        console.log('📊 Products result length:', productsResult?.length);
+        console.log('📊 Products result keys:', Object.keys(productsResult || {}));
         
-        if (!productsResult || productsResult.length === 0) {
+        // Check if it's an array or if data is in a property
+        let productsArray = productsResult;
+        if (!Array.isArray(productsResult) && productsResult?.rows) {
+          console.log('📊 Found .rows property, using that instead');
+          productsArray = productsResult.rows;
+        }
+        
+        if (!productsArray || productsArray.length === 0) {
+          console.error('❌ No products found. Result:', JSON.stringify(productsResult, null, 2));
           throw new Error('No products found in MySQL table');
         }
 
-        console.log(`✅ Retrieved ${productsResult.length} products from MySQL`);
+        console.log(`✅ Retrieved ${productsArray.length} products from MySQL`);
 
         // Transform MySQL data to our format
         const products: IparluxProduct[] = [];
         let skipped = 0;
 
-        for (const row of productsResult) {
+        for (const row of productsArray) {
           try {
             // Map fields (adjust based on actual column names)
             const sku = row.referencia || row.codigo || row.sku || row.id;
