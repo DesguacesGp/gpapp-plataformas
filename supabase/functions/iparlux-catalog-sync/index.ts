@@ -198,12 +198,22 @@ Deno.serve(async (req) => {
           throw new Error('No valid products after transformation');
         }
 
+        // Deduplicate by SKU (keep last occurrence)
+        console.log('🔄 Deduplicating products by SKU...');
+        const uniqueProducts = new Map<string, IparluxProduct>();
+        for (const product of products) {
+          uniqueProducts.set(product.sku, product);
+        }
+        const deduplicatedProducts = Array.from(uniqueProducts.values());
+        const duplicatesRemoved = products.length - deduplicatedProducts.length;
+        console.log(`✅ Deduplicated: ${deduplicatedProducts.length} unique products (removed ${duplicatesRemoved} duplicates)`);
+
         // Upsert products to Supabase in batches
         const batchSize = 100;
         let successCount = 0;
 
-        for (let i = 0; i < products.length; i += batchSize) {
-          const batch = products.slice(i, i + batchSize);
+        for (let i = 0; i < deduplicatedProducts.length; i += batchSize) {
+          const batch = deduplicatedProducts.slice(i, i + batchSize);
           
           const { error } = await supabaseClient
             .from('iparlux_products')
