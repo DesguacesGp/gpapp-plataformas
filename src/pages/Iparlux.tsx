@@ -6,7 +6,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
 const Iparlux = () => {
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [isSyncingStock, setIsSyncingStock] = useState(false);
+  const [isSyncingCatalog, setIsSyncingCatalog] = useState(false);
   const [stats, setStats] = useState({
     total: 0,
     withImages: 0,
@@ -35,9 +36,9 @@ const Iparlux = () => {
     }
   };
 
-  const handleSync = async () => {
-    setIsSyncing(true);
-    toast.info("Conectando al FTP de Iparlux...");
+  const handleStockSync = async () => {
+    setIsSyncingStock(true);
+    toast.info("Actualizando stock desde FTP...");
     
     try {
       const { data, error } = await supabase.functions.invoke('iparlux-sync', {
@@ -46,15 +47,39 @@ const Iparlux = () => {
 
       if (error) throw error;
 
-      toast.success(data.message || "Catálogo sincronizado correctamente");
-      
-      // Reload statistics
+      toast.success(data.message || "Stock actualizado correctamente");
       await loadStats();
     } catch (error: any) {
-      console.error('Sync error:', error);
-      toast.error("Error al sincronizar: " + error.message);
+      console.error('Stock sync error:', error);
+      toast.error("Error al actualizar stock: " + error.message);
     } finally {
-      setIsSyncing(false);
+      setIsSyncingStock(false);
+    }
+  };
+
+  const handleCatalogSync = async () => {
+    setIsSyncingCatalog(true);
+    toast.info("Sincronizando catálogo desde MySQL...");
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('iparlux-catalog-sync', {
+        body: { action: 'sync_catalog' }
+      });
+
+      if (error) throw error;
+
+      if (data.success === false) {
+        toast.warning(data.message || "Sincronización MySQL no disponible");
+      } else {
+        toast.success(data.message || "Catálogo sincronizado correctamente");
+      }
+      
+      await loadStats();
+    } catch (error: any) {
+      console.error('Catalog sync error:', error);
+      toast.error("Error al sincronizar catálogo: " + error.message);
+    } finally {
+      setIsSyncingCatalog(false);
     }
   };
 
@@ -120,12 +145,22 @@ const Iparlux = () => {
         <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-2">
             <Button
-              onClick={handleSync}
-              disabled={isSyncing}
+              onClick={handleStockSync}
+              disabled={isSyncingStock}
               className="gap-2"
             >
-              <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
-              Sincronizar Catálogo FTP
+              <RefreshCw className={`h-4 w-4 ${isSyncingStock ? "animate-spin" : ""}`} />
+              Actualizar Stock (FTP)
+            </Button>
+
+            <Button
+              onClick={handleCatalogSync}
+              disabled={isSyncingCatalog}
+              variant="secondary"
+              className="gap-2"
+            >
+              <Download className={`h-4 w-4 ${isSyncingCatalog ? "animate-spin" : ""}`} />
+              Sincronizar Catálogo (MySQL)
             </Button>
 
             <Button variant="outline" className="gap-2" disabled>
@@ -134,12 +169,22 @@ const Iparlux = () => {
             </Button>
           </div>
 
-          <div className="bg-muted p-4 rounded-lg">
-            <h3 className="font-semibold mb-2">Información de Conexión</h3>
-            <div className="text-sm space-y-1 text-muted-foreground">
-              <p>• FTP: ftpclientes.iparlux.es</p>
-              <p>• Usuario: i003777</p>
-              <p>• Imágenes: http://www.iparlux.es/imagenes/catalogo/</p>
+          <div className="bg-muted p-4 rounded-lg space-y-3">
+            <div>
+              <h3 className="font-semibold mb-2">📦 Actualización de Stock (FTP)</h3>
+              <div className="text-sm space-y-1 text-muted-foreground">
+                <p>• Se actualiza cada hora automáticamente</p>
+                <p>• FTP: ftpclientes.iparlux.es</p>
+                <p>• Usuario: i003777</p>
+              </div>
+            </div>
+            <div className="border-t pt-3">
+              <h3 className="font-semibold mb-2">📊 Catálogo Completo (MySQL)</h3>
+              <div className="text-sm space-y-1 text-muted-foreground">
+                <p>• Servidor: iparlux.es</p>
+                <p>• Base de datos: catalogo_iparlux</p>
+                <p>• Nota: Requiere configuración adicional</p>
+              </div>
             </div>
           </div>
         </CardContent>

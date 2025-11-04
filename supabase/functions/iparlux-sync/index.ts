@@ -206,9 +206,9 @@ Deno.serve(async (req) => {
       console.log('🔄 Starting Iparlux catalog sync...');
       
       // Get FTP configuration from environment
-      const ftpHost = Deno.env.get('IPARLUX_FTP_HOST') || 'ftpclientes.iparlux.es';
-      const ftpUser = Deno.env.get('IPARLUX_FTP_USER') || '';
-      const ftpPassword = Deno.env.get('IPARLUX_FTP_PASSWORD') || '';
+      const ftpHost = Deno.env.get('IPARLUX_FTP_HOST')?.trim() || 'ftpclientes.iparlux.es';
+      const ftpUser = Deno.env.get('IPARLUX_FTP_USER')?.trim() || '';
+      const ftpPassword = Deno.env.get('IPARLUX_FTP_PASSWORD')?.trim() || '';
       const imageBaseUrl = Deno.env.get('IPARLUX_IMAGE_BASE_URL') || 'http://www.iparlux.es/imagenes/catalogo';
 
       // Validate credentials
@@ -217,8 +217,8 @@ Deno.serve(async (req) => {
       }
 
       console.log(`📡 Connecting to FTP: ${ftpHost}`);
-      console.log(`👤 User: ${ftpUser} (length: ${ftpUser.length})`);
-      console.log(`🔑 Password configured: ${ftpPassword ? 'Yes' : 'No'} (length: ${ftpPassword.length})`);
+      console.log(`👤 User: "${ftpUser}" (length: ${ftpUser.length})`);
+      console.log(`🔑 Password: "${ftpPassword.substring(0, 3)}***" (length: ${ftpPassword.length})`);
 
       let conn: Deno.Conn | null = null;
       
