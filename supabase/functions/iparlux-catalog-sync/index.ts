@@ -94,12 +94,12 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'MySQL direct connection not supported in Edge Functions',
-          message: 'Para sincronizar el catálogo MySQL de Iparlux, necesitamos una de estas soluciones:\n\n' +
-                   '1. Crear un endpoint REST en iparlux.es que exponga los datos del catálogo\n' +
-                   '2. Exportar el catálogo MySQL a un archivo CSV/JSON en el FTP\n' +
-                   '3. Usar un servicio intermedio que convierta MySQL a REST API\n\n' +
-                   'Por ahora, usa la sincronización FTP para el stock disponible.',
+          message: '⚠️ La sincronización MySQL requiere configuración adicional.\n\n' +
+                   'Las Edge Functions no pueden conectarse directamente a MySQL. ' +
+                   'Por ahora, usa "Actualizar Stock FTP" para mantener los productos actualizados.\n\n' +
+                   'Contacta con Iparlux para solicitar:\n' +
+                   '• Exportar el catálogo completo al FTP como archivo CSV/JSON\n' +
+                   '• O crear un endpoint REST API para acceder al catálogo',
           alternatives: {
             ftp: 'Usa el botón "Actualizar Stock FTP" para sincronizar stock',
             mysql_export: 'Solicita a Iparlux exportar el catálogo como CSV al FTP',
@@ -107,7 +107,7 @@ Deno.serve(async (req) => {
           }
         }),
         {
-          status: 501,
+          status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );

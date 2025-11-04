@@ -59,7 +59,7 @@ const Iparlux = () => {
 
   const handleCatalogSync = async () => {
     setIsSyncingCatalog(true);
-    toast.info("Sincronizando catálogo desde MySQL...");
+    toast.info("Conectando con catálogo MySQL...");
     
     try {
       const { data, error } = await supabase.functions.invoke('iparlux-catalog-sync', {
@@ -68,16 +68,18 @@ const Iparlux = () => {
 
       if (error) throw error;
 
-      if (data.success === false) {
-        toast.warning(data.message || "Sincronización MySQL no disponible");
+      if (data?.success === false) {
+        toast.warning(data.message, {
+          duration: 8000,
+          description: "Usa 'Actualizar Stock FTP' mientras tanto"
+        });
       } else {
-        toast.success(data.message || "Catálogo sincronizado correctamente");
+        toast.success(data?.message || "Catálogo sincronizado correctamente");
+        await loadStats();
       }
-      
-      await loadStats();
     } catch (error: any) {
       console.error('Catalog sync error:', error);
-      toast.error("Error al sincronizar catálogo: " + error.message);
+      toast.error("Error al conectar con MySQL: " + error.message);
     } finally {
       setIsSyncingCatalog(false);
     }
