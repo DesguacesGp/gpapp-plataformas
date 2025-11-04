@@ -18,6 +18,166 @@ interface IparluxProduct {
   referencia?: string;
 }
 
+// Helper function to connect to FTP using basic TCP socket
+async function ftpConnect(host: string, user: string, password: string): Promise<Deno.Conn> {
+  console.log(`🔌 Opening TCP connection to ${host}:21...`);
+  const conn = await Deno.connect({ hostname: host, port: 21 });
+  
+  // Read welcome message
+  const welcomeBuffer = new Uint8Array(1024);
+  await conn.read(welcomeBuffer);
+  const welcome = new TextDecoder().decode(welcomeBuffer);
+  console.log('📨 Server welcome:', welcome.substring(0, 100));
+  
+  // Send USER command
+  const userCmd = `USER ${user}\r\n`;
+  await conn.write(new TextEncoder().encode(userCmd));
+  
+  const userBuffer = new Uint8Array(1024);
+  await conn.read(userBuffer);
+  const userResponse = new TextDecoder().decode(userBuffer);
+  console.log('📨 USER response:', userResponse.substring(0, 100));
+  
+  // Send PASS command
+  const passCmd = `PASS ${password}\r\n`;
+  await conn.write(new TextEncoder().encode(passCmd));
+  
+  const passBuffer = new Uint8Array(1024);
+  await conn.read(passBuffer);
+  const passResponse = new TextDecoder().decode(passBuffer);
+  console.log('📨 PASS response:', passResponse.substring(0, 100));
+  
+  if (!passResponse.includes('230')) {
+    throw new Error(`FTP login failed: ${passResponse}`);
+  }
+  
+  console.log('✅ FTP authentication successful');
+  return conn;
+}
+
+async function ftpList(conn: Deno.Conn): Promise<string[]> {
+  // Enter passive mode
+  const pasvCmd = 'PASV\r\n';
+  await conn.write(new TextEncoder().encode(pasvCmd));
+  
+  const pasvBuffer = new Uint8Array(1024);
+  await conn.read(pasvBuffer);
+  const pasvResponse = new TextDecoder().decode(pasvBuffer);
+  console.log('📨 PASV response:', pasvResponse.substring(0, 150));
+  
+  // Extract IP and port from PASV response
+  // Format: 227 Entering Passive Mode (h1,h2,h3,h4,p1,p2)
+  const match = pasvResponse.match(/\((\d+),(\d+),(\d+),(\d+),(\d+),(\d+)\)/);
+  if (!match) {
+    throw new Error('Failed to parse PASV response');
+  }
+  
+  const dataHost = `${match[1]}.${match[2]}.${match[3]}.${match[4]}`;
+  const dataPort = parseInt(match[5]) * 256 + parseInt(match[6]);
+  console.log(`📡 Data connection: ${dataHost}:${dataPort}`);
+  
+  // Connect to data port
+  const dataConn = await Deno.connect({ hostname: dataHost, port: dataPort });
+  
+  // Send LIST command
+  const listCmd = 'LIST\r\n';
+  await conn.write(new TextEncoder().encode(listCmd));
+  
+  // Read list response
+  const chunks: Uint8Array[] = [];
+  const buffer = new Uint8Array(4096);
+  
+  while (true) {
+    const n = await dataConn.read(buffer);
+    if (n === null) break;
+    chunks.push(buffer.slice(0, n));
+  }
+  
+  dataConn.close();
+  
+  // Read completion message from control connection
+  const completeBuffer = new Uint8Array(1024);
+  await conn.read(completeBuffer);
+  
+  const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+  const combined = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    combined.set(chunk, offset);
+    offset += chunk.length;
+  }
+  
+  const listOutput = new TextDecoder().decode(combined);
+  const files = listOutput.split('\n')
+    .filter(line => line.trim())
+    .map(line => {
+      const parts = line.trim().split(/\s+/);
+      return parts[parts.length - 1];
+    });
+  
+  return files;
+}
+
+async function ftpDownload(conn: Deno.Conn, filename: string): Promise<string> {
+  // Enter passive mode
+  const pasvCmd = 'PASV\r\n';
+  await conn.write(new TextEncoder().encode(pasvCmd));
+  
+  const pasvBuffer = new Uint8Array(1024);
+  await conn.read(pasvBuffer);
+  const pasvResponse = new TextDecoder().decode(pasvBuffer);
+  
+  // Extract IP and port from PASV response
+  const match = pasvResponse.match(/\((\d+),(\d+),(\d+),(\d+),(\d+),(\d+)\)/);
+  if (!match) {
+    throw new Error('Failed to parse PASV response for download');
+  }
+  
+  const dataHost = `${match[1]}.${match[2]}.${match[3]}.${match[4]}`;
+  const dataPort = parseInt(match[5]) * 256 + parseInt(match[6]);
+  
+  // Connect to data port
+  const dataConn = await Deno.connect({ hostname: dataHost, port: dataPort });
+  
+  // Send RETR command
+  const retrCmd = `RETR ${filename}\r\n`;
+  await conn.write(new TextEncoder().encode(retrCmd));
+  
+  // Read status
+  const statusBuffer = new Uint8Array(1024);
+  await conn.read(statusBuffer);
+  const statusResponse = new TextDecoder().decode(statusBuffer);
+  console.log('📨 RETR response:', statusResponse.substring(0, 100));
+  
+  // Read file data
+  const chunks: Uint8Array[] = [];
+  const buffer = new Uint8Array(8192);
+  
+  while (true) {
+    const n = await dataConn.read(buffer);
+    if (n === null) break;
+    chunks.push(buffer.slice(0, n));
+  }
+  
+  dataConn.close();
+  
+  // Read completion message
+  const completeBuffer = new Uint8Array(1024);
+  await conn.read(completeBuffer);
+  const completeResponse = new TextDecoder().decode(completeBuffer);
+  console.log('📨 Transfer complete:', completeResponse.substring(0, 100));
+  
+  const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+  const combined = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    combined.set(chunk, offset);
+    offset += chunk.length;
+  }
+  
+  return new TextDecoder().decode(combined);
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -41,69 +201,50 @@ Deno.serve(async (req) => {
       const ftpPassword = Deno.env.get('IPARLUX_FTP_PASSWORD') || '';
       const imageBaseUrl = Deno.env.get('IPARLUX_IMAGE_BASE_URL') || 'http://www.iparlux.es/imagenes/catalogo';
 
-      console.log(`📡 Connecting to FTP: ${ftpHost}`);
+      console.log(`📡 Connecting to FTP: ${ftpHost} as user: ${ftpUser}`);
 
-      // Connect to FTP server
-      const ftpUrl = `ftp://${ftpUser}:${ftpPassword}@${ftpHost}`;
+      let conn: Deno.Conn | null = null;
       
       try {
-        // List files in FTP directory
-        const listResponse = await fetch(ftpUrl);
+        // Connect to FTP
+        conn = await ftpConnect(ftpHost, ftpUser, ftpPassword);
         
-        if (!listResponse.ok) {
-          throw new Error(`FTP connection failed: ${listResponse.status}`);
-        }
+        // List files
+        console.log('📂 Listing files...');
+        const files = await ftpList(conn);
+        console.log(`📂 Found ${files.length} files:`, files.join(', '));
 
-        const listContent = await listResponse.text();
-        console.log('📂 FTP directory listing:', listContent.substring(0, 500));
-
-        // Look for catalog file (common names: stock.txt, catalogo.csv, productos.txt, etc.)
-        const lines = listContent.split('\n');
+        // Look for catalog file
         let catalogFileName = '';
+        const patterns = ['stock', 'catalogo', 'producto', '.csv', '.txt'];
         
-        for (const line of lines) {
-          const lower = line.toLowerCase();
-          if (lower.includes('stock') || lower.includes('catalogo') || lower.includes('producto') || lower.includes('.csv') || lower.includes('.txt')) {
-            // Extract filename from FTP listing
-            const parts = line.trim().split(/\s+/);
-            catalogFileName = parts[parts.length - 1];
+        for (const file of files) {
+          const fileLower = file.toLowerCase();
+          if (patterns.some(pattern => fileLower.includes(pattern))) {
+            catalogFileName = file;
+            console.log(`📄 Found catalog file: ${file}`);
             break;
           }
         }
 
         if (!catalogFileName) {
           // Try common default names
-          const commonNames = ['stock.txt', 'STOCK.TXT', 'catalogo.csv', 'CATALOGO.CSV', 'productos.txt', 'PRODUCTOS.TXT'];
+          const commonNames = ['stock.txt', 'STOCK.TXT', 'catalogo.csv', 'CATALOGO.CSV'];
           for (const name of commonNames) {
-            try {
-              const testUrl = `${ftpUrl}/${name}`;
-              const testResponse = await fetch(testUrl);
-              if (testResponse.ok) {
-                catalogFileName = name;
-                break;
-              }
-            } catch (e) {
-              console.log(`File ${name} not found, trying next...`);
+            if (files.includes(name)) {
+              catalogFileName = name;
+              break;
             }
           }
         }
 
         if (!catalogFileName) {
-          throw new Error('No catalog file found in FTP. Available files: ' + listContent);
+          throw new Error(`No catalog file found in FTP. Available files: ${files.join(', ')}`);
         }
 
-        console.log('📄 Downloading catalog file:', catalogFileName);
-
-        // Download the catalog file
-        const fileUrl = `${ftpUrl}/${catalogFileName}`;
-        const fileResponse = await fetch(fileUrl);
-        
-        if (!fileResponse.ok) {
-          throw new Error(`Failed to download catalog: ${fileResponse.status}`);
-        }
-
-        const fileContent = await fileResponse.text();
-        console.log(`📋 File size: ${fileContent.length} characters`);
+        console.log(`📥 Downloading catalog file: ${catalogFileName}`);
+        const fileContent = await ftpDownload(conn, catalogFileName);
+        console.log(`📋 Downloaded ${fileContent.length} characters`);
 
         // Parse the file content
         const fileLines = fileContent.split('\n');
@@ -112,7 +253,7 @@ Deno.serve(async (req) => {
         const products: IparluxProduct[] = [];
         let skippedLines = 0;
 
-        // Detect delimiter (could be ;, |, tab, comma)
+        // Detect delimiter
         const firstDataLine = fileLines[1] || fileLines[0];
         let delimiter = ';';
         if (firstDataLine.includes('|')) delimiter = '|';
@@ -129,10 +270,6 @@ Deno.serve(async (req) => {
           try {
             const fields = line.split(delimiter).map(f => f.trim());
             
-            // Flexible field mapping - adjust indices based on actual file format
-            // Common formats:
-            // - SKU;Description;Stock;Price
-            // - Reference;Description;Price;Stock;Category
             if (fields.length < 3) {
               skippedLines++;
               continue;
@@ -149,10 +286,8 @@ Deno.serve(async (req) => {
               const num = parseFloat(cleaned);
               if (!isNaN(num)) {
                 if (num > 100) {
-                  // Likely a price (usually higher value)
                   if (price === 0) price = num;
                 } else {
-                  // Likely stock (usually smaller value)
                   if (stock === 0) stock = Math.floor(num);
                 }
               }
@@ -211,6 +346,9 @@ Deno.serve(async (req) => {
           console.log(`✅ Processed batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(products.length / batchSize)} (${successCount} products)`);
         }
 
+        // Close FTP connection
+        conn.close();
+
         return new Response(
           JSON.stringify({
             success: true,
@@ -225,6 +363,13 @@ Deno.serve(async (req) => {
         );
 
       } catch (ftpError) {
+        if (conn) {
+          try {
+            conn.close();
+          } catch (e) {
+            console.error('Error closing FTP connection:', e);
+          }
+        }
         console.error('❌ FTP Error:', ftpError);
         throw new Error(`FTP Error: ${ftpError instanceof Error ? ftpError.message : 'Unknown error'}`);
       }
