@@ -73,22 +73,19 @@ Deno.serve(async (req) => {
         // First, let's explore the database structure
         console.log('🔍 Exploring database tables...');
         const tablesResult = await mysqlClient.query('SHOW TABLES');
-        console.log('📋 Tables result structure:', JSON.stringify(tablesResult, null, 2));
-        console.log('📋 Tables rows:', tablesResult.rows);
-        console.log('📋 Tables rows length:', tablesResult.rows?.length);
+        console.log('📋 Tables result (direct array):', JSON.stringify(tablesResult, null, 2));
 
-        if (!tablesResult.rows || tablesResult.rows.length === 0) {
+        if (!tablesResult || tablesResult.length === 0) {
           throw new Error('No tables found in database. Please verify database permissions and that tables exist.');
         }
 
         // Try to find the products table
-        let productsTable = '';
         const availableTables: string[] = [];
         
-        for (const row of tablesResult.rows) {
+        // MySQL library returns data directly in the array, not in .rows
+        for (const row of tablesResult) {
           console.log('📦 Processing row:', row);
-          // MySQL returns tables in different formats depending on the query
-          // Could be: { "Tables_in_db": "table_name" } or array format
+          // MySQL returns tables as: { "Tables_in_catalogo_iparlux": "catalogo_iparlux" }
           let tableName = '';
           
           if (typeof row === 'string') {
@@ -103,32 +100,19 @@ Deno.serve(async (req) => {
           if (tableName) {
             availableTables.push(tableName);
             console.log(`📌 Found table: ${tableName}`);
-            
-            const lowerName = tableName.toLowerCase();
-            if (lowerName.includes('producto') || 
-                lowerName.includes('articulo') ||
-                lowerName.includes('referencia') ||
-                lowerName.includes('product')) {
-              productsTable = tableName;
-              console.log(`✅ Selected products table: ${tableName}`);
-              break;
-            }
           }
         }
 
         console.log('📋 All available tables:', availableTables);
 
-        if (!productsTable && availableTables.length > 0) {
-          // Use the first table if we can't find a specific one
-          productsTable = availableTables[0];
-          console.log(`⚠️ No specific product table found, using first table: ${productsTable}`);
+        // We know the table is called "catalogo_iparlux" from logs
+        const productsTable = 'catalogo_iparlux';
+        
+        if (!availableTables.includes(productsTable)) {
+          throw new Error(`Table "${productsTable}" not found. Available tables: ${availableTables.join(', ')}`);
         }
 
-        if (!productsTable) {
-          throw new Error(`No product table found in database. Available tables: ${availableTables.join(', ') || 'none'}`);
-        }
-
-        console.log(`📦 Using table: ${productsTable}`);
+        console.log(`✅ Using confirmed table: ${productsTable}`);
 
         // Get table structure
         const structureResult = await mysqlClient.query(`DESCRIBE ${productsTable}`);
