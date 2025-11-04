@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { RefreshCw, Download, Package } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { IparluxProductsTable } from "@/components/IparluxProductsTable";
 
 const Iparlux = () => {
   const [isSyncingStock, setIsSyncingStock] = useState(false);
@@ -15,27 +16,101 @@ const Iparlux = () => {
     withImages: 0,
     processed: 0
   });
+  const [products, setProducts] = useState<any[]>([]);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [sortField, setSortField] = useState("sku");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const pageSize = 50;
 
   useEffect(() => {
     loadStats();
+    loadProducts();
   }, []);
+
+  useEffect(() => {
+    loadProducts();
+  }, [currentPage, searchTerm, sortField, sortDirection]);
 
   const loadStats = async () => {
     try {
-      const { data, error } = await supabase
+      // Get total count
+      const { count: totalCount, error: countError } = await supabase
         .from('iparlux_products')
-        .select('has_image, processed_image_url');
+        .select('*', { count: 'exact', head: true });
       
-      if (error) throw error;
+      if (countError) throw countError;
 
-      const total = data?.length || 0;
-      const withImages = data?.filter(p => p.has_image).length || 0;
-      const processed = data?.filter(p => p.processed_image_url).length || 0;
+      // Get images stats
+      const { count: withImagesCount, error: imagesError } = await supabase
+        .from('iparlux_products')
+        .select('*', { count: 'exact', head: true })
+        .eq('has_image', true);
       
-      setStats({ total, withImages, processed });
+      if (imagesError) throw imagesError;
+
+      // Get processed stats
+      const { count: processedCount, error: processedError } = await supabase
+        .from('iparlux_products')
+        .select('*', { count: 'exact', head: true })
+        .not('processed_image_url', 'is', null);
+      
+      if (processedError) throw processedError;
+      
+      setStats({ 
+        total: totalCount || 0, 
+        withImages: withImagesCount || 0, 
+        processed: processedCount || 0 
+      });
     } catch (error) {
       console.error('Error loading stats:', error);
     }
+  };
+
+  const loadProducts = async () => {
+    setIsLoadingProducts(true);
+    try {
+      let query = supabase
+        .from('iparlux_products')
+        .select('*', { count: 'exact' });
+
+      // Apply search filter
+      if (searchTerm) {
+        query = query.or(`sku.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
+      }
+
+      // Apply sorting
+      query = query.order(sortField, { ascending: sortDirection === "asc" });
+
+      // Apply pagination
+      const from = (currentPage - 1) * pageSize;
+      const to = from + pageSize - 1;
+      query = query.range(from, to);
+
+      const { data, error, count } = await query;
+
+      if (error) throw error;
+
+      setProducts(data || []);
+      setTotalPages(Math.ceil((count || 0) / pageSize));
+    } catch (error) {
+      console.error('Error loading products:', error);
+      toast.error("Error al cargar productos");
+    } finally {
+      setIsLoadingProducts(false);
+    }
+  };
+
+  const handleSortChange = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+    setCurrentPage(1);
   };
 
   const handleStockSync = async () => {
@@ -272,15 +347,29 @@ const Iparlux = () => {
         <CardHeader>
           <CardTitle>Productos Iparlux</CardTitle>
           <CardDescription>
-            Listado de productos (próximamente)
+            Catálogo completo de productos ({stats.total.toLocaleString()} productos)
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-12 text-muted-foreground">
-            <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>La tabla de productos se mostrará aquí</p>
-            <p className="text-sm mt-2">Primero sincroniza el catálogo para ver los datos</p>
-          </div>
+          {isLoadingProducts ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <RefreshCw className="h-12 w-12 mx-auto mb-4 opacity-50 animate-spin" />
+              <p>Cargando productos...</p>
+            </div>
+          ) : (
+            <IparluxProductsTable
+              products={products}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              totalProducts={stats.total}
+              sortField={sortField}
+              sortDirection={sortDirection}
+              onSortChange={handleSortChange}
+            />
+          )}
         </CardContent>
       </Card>
     </div>
