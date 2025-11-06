@@ -31,23 +31,43 @@ Deno.serve(async (req) => {
 
     console.log(`📋 Found ${mappingRules.length} active mapping rules`);
 
-    // Get all products that need categorization
-    const { data: products, error: productsError } = await supabase
+    // Get total count of products
+    const { count: totalCount, error: countError } = await supabase
       .from('vauner_products')
-      .select('id, sku, category, articulo, description');
+      .select('*', { count: 'exact', head: true });
 
-    if (productsError) {
-      throw new Error(`Error fetching products: ${productsError.message}`);
+    if (countError) {
+      throw new Error(`Error counting products: ${countError.message}`);
     }
 
-    console.log(`📦 Processing ${products.length} products...`);
+    console.log(`📊 Total products in database: ${totalCount}`);
+
+    // Fetch all products in batches
+    const batchSize = 1000;
+    let allProducts: any[] = [];
+
+    for (let offset = 0; offset < totalCount; offset += batchSize) {
+      const { data: batch, error: batchError } = await supabase
+        .from('vauner_products')
+        .select('id, sku, category, articulo, description')
+        .range(offset, offset + batchSize - 1);
+
+      if (batchError) {
+        throw new Error(`Error fetching batch at offset ${offset}: ${batchError.message}`);
+      }
+
+      allProducts = allProducts.concat(batch || []);
+      console.log(`📥 Fetched batch ${Math.floor(offset / batchSize) + 1}/${Math.ceil(totalCount / batchSize)}, total loaded: ${allProducts.length}`);
+    }
+
+    console.log(`📦 Processing ${allProducts.length} products...`);
 
     let categorizedCount = 0;
     let uncategorizedCount = 0;
     const updates: any[] = [];
 
     // Process each product
-    for (const product of products) {
+    for (const product of allProducts) {
       let matched = false;
 
       // Try to match with mapping rules
@@ -125,7 +145,7 @@ Deno.serve(async (req) => {
     }
 
     const stats = {
-      total: products.length,
+      total: allProducts.length,
       categorized: categorizedCount,
       uncategorized: uncategorizedCount,
       success: true
