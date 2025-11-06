@@ -20,6 +20,8 @@ import {
 interface Product {
   id: string;
   sku: string;
+  categoria: string | null;
+  subcategoria: string | null;
   description: string;
   stock: number;
   price: number;
@@ -57,6 +59,10 @@ interface ProductsTableProps {
   onCategoryChange: (category: string) => void;
   articuloFilter: string;
   onArticuloChange: (articulo: string) => void;
+  categoriaFilter: string;
+  onCategoriaChange: (categoria: string) => void;
+  subcategoriaFilter: string;
+  onSubcategoriaChange: (subcategoria: string) => void;
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
@@ -75,6 +81,10 @@ export const ProductsTable = ({
   onCategoryChange,
   articuloFilter,
   onArticuloChange,
+  categoriaFilter,
+  onCategoriaChange,
+  subcategoriaFilter,
+  onSubcategoriaChange,
   currentPage,
   totalPages,
   onPageChange,
@@ -85,9 +95,11 @@ export const ProductsTable = ({
 }: ProductsTableProps) => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  // Get enabled categories and articulos from database
+  // Get enabled categories, articulos, categorias and subcategorias from database
   const [categories, setCategories] = useState<string[]>([]);
   const [articulos, setArticulos] = useState<string[]>([]);
+  const [categorias, setCategorias] = useState<string[]>([]);
+  const [subcategorias, setSubcategorias] = useState<string[]>([]);
 
   useEffect(() => {
     // Fetch enabled categories from category_config table
@@ -128,8 +140,38 @@ export const ProductsTable = ({
       setArticulos(uniqueArticulos);
     };
 
+    // Fetch unique categorias
+    const loadCategorias = async () => {
+      const { data, error } = await supabase
+        .from('vauner_products')
+        .select('categoria')
+        .not('categoria', 'is', null)
+        .order('categoria', { ascending: true });
+
+      if (!error && data) {
+        const uniqueCategorias = [...new Set(data.map(p => p.categoria).filter(Boolean))];
+        setCategorias(uniqueCategorias as string[]);
+      }
+    };
+
+    // Fetch unique subcategorias
+    const loadSubcategorias = async () => {
+      const { data, error } = await supabase
+        .from('vauner_products')
+        .select('subcategoria')
+        .not('subcategoria', 'is', null)
+        .order('subcategoria', { ascending: true });
+
+      if (!error && data) {
+        const uniqueSubcategorias = [...new Set(data.map(p => p.subcategoria).filter(Boolean))];
+        setSubcategorias(uniqueSubcategorias as string[]);
+      }
+    };
+
     loadCategories();
     loadArticulos();
+    loadCategorias();
+    loadSubcategorias();
   }, []);
 
   const SortButton = ({ field, children }: { field: string; children: React.ReactNode }) => {
@@ -293,6 +335,26 @@ export const ProductsTable = ({
             <option key={art} value={art}>{art}</option>
           ))}
         </select>
+        <select
+          value={categoriaFilter}
+          onChange={(e) => onCategoriaChange(e.target.value)}
+          className="px-4 py-2 border rounded-md bg-background"
+        >
+          <option value="all">Todas las categorías</option>
+          {categorias.map(cat => (
+            <option key={cat} value={cat}>{cat}</option>
+          ))}
+        </select>
+        <select
+          value={subcategoriaFilter}
+          onChange={(e) => onSubcategoriaChange(e.target.value)}
+          className="px-4 py-2 border rounded-md bg-background"
+        >
+          <option value="all">Todas las subcategorías</option>
+          {subcategorias.map(sub => (
+            <option key={sub} value={sub}>{sub}</option>
+          ))}
+        </select>
       </div>
 
       <div className="rounded-lg border bg-card overflow-hidden">
@@ -307,6 +369,12 @@ export const ProductsTable = ({
               </TableHead>
               <TableHead>
                 <SortButton field="sku">SKU</SortButton>
+              </TableHead>
+              <TableHead className="w-32">
+                <SortButton field="categoria">Categoría</SortButton>
+              </TableHead>
+              <TableHead className="w-32">
+                <SortButton field="subcategoria">Subcategoría</SortButton>
               </TableHead>
               <TableHead className="w-32">
                 <SortButton field="articulo">Artículo</SortButton>
@@ -368,6 +436,24 @@ export const ProductsTable = ({
                     />
                   </TableCell>
                   <TableCell className="font-medium">{product.sku}</TableCell>
+                  <TableCell className="text-sm truncate max-w-[130px]">
+                    {product.categoria ? (
+                      <Badge variant="secondary" className="text-xs">
+                        {product.categoria}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">Sin clasificar</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-sm truncate max-w-[130px]">
+                    {product.subcategoria ? (
+                      <Badge variant="outline" className="text-xs">
+                        {product.subcategoria}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">-</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-sm truncate max-w-[130px]">{product.articulo || "-"}</TableCell>
                   <TableCell className="text-sm font-medium">
                     {product.marca || "-"}

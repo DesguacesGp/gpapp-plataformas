@@ -10,6 +10,8 @@ import { toast } from "sonner";
 interface Product {
   id: string;
   sku: string;
+  categoria: string | null;
+  subcategoria: string | null;
   description: string;
   stock: number;
   price: number;
@@ -57,6 +59,8 @@ const Index = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [articuloFilter, setArticuloFilter] = useState<string>("all");
+  const [categoriaFilter, setCategoriaFilter] = useState<string>("all");
+  const [subcategoriaFilter, setSubcategoriaFilter] = useState<string>("all");
   const [sortField, setSortField] = useState<string>("ai_processed");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const productsPerPage = 20;
@@ -139,6 +143,16 @@ const Index = () => {
       // Apply articulo filter
       if (articuloFilter !== "all") {
         query = query.eq('articulo', articuloFilter);
+      }
+
+      // Apply categoria filter
+      if (categoriaFilter !== "all") {
+        query = query.eq('categoria', categoriaFilter);
+      }
+
+      // Apply subcategoria filter
+      if (subcategoriaFilter !== "all") {
+        query = query.eq('subcategoria', subcategoriaFilter);
       }
 
       // Get total count for pagination
@@ -352,6 +366,30 @@ const Index = () => {
     }
   };
 
+  const categorizeProducts = async () => {
+    try {
+      toast.info('🏷️ Categorizando productos...');
+      
+      const { data, error } = await supabase.functions.invoke('categorize-vauner-products');
+
+      if (error) throw error;
+
+      if (data.success) {
+        toast.success(
+          `✅ Categorización completada\n` +
+          `📦 Total: ${data.total}\n` +
+          `✓ Categorizados: ${data.categorized}\n` +
+          `⚠️ Sin clasificar: ${data.uncategorized}`
+        );
+        loadProducts();
+      } else {
+        toast.error('Error al categorizar productos');
+      }
+    } catch (error: any) {
+      console.error('Error categorizing:', error);
+      toast.error('Error al categorizar: ' + error.message);
+    }
+  };
 
   const processWithAI = async () => {
     setIsProcessingAI(true);
@@ -926,7 +964,7 @@ const Index = () => {
     if (!isCheckingAuth) {
       loadProducts();
     }
-  }, [isCheckingAuth, currentPage, searchTerm, categoryFilter, articuloFilter, sortField, sortDirection]);
+  }, [isCheckingAuth, currentPage, searchTerm, categoryFilter, articuloFilter, categoriaFilter, subcategoriaFilter, sortField, sortDirection]);
 
   const handleSearchChange = useCallback((search: string) => {
     // Clear previous timeout
@@ -948,6 +986,16 @@ const Index = () => {
 
   const handleArticuloChange = useCallback((articulo: string) => {
     setArticuloFilter(articulo);
+    setCurrentPage(1); // Reset to first page on filter change
+  }, []);
+
+  const handleCategoriaChange = useCallback((categoria: string) => {
+    setCategoriaFilter(categoria);
+    setCurrentPage(1); // Reset to first page on filter change
+  }, []);
+
+  const handleSubcategoriaChange = useCallback((subcategoria: string) => {
+    setSubcategoriaFilter(subcategoria);
     setCurrentPage(1); // Reset to first page on filter change
   }, []);
 
@@ -1110,6 +1158,15 @@ const Index = () => {
                   }
                 </Button>
                 <Button
+                  onClick={categorizeProducts}
+                  variant="outline"
+                  disabled={isSyncing}
+                  size="lg"
+                >
+                  <Package className={`mr-2 h-5 w-5`} />
+                  Categorizar Productos
+                </Button>
+                <Button
                   onClick={exportSelected}
                   variant="outline"
                   disabled={selectedIds.length === 0}
@@ -1157,6 +1214,10 @@ const Index = () => {
                 onCategoryChange={handleCategoryChange}
                 articuloFilter={articuloFilter}
                 onArticuloChange={handleArticuloChange}
+                categoriaFilter={categoriaFilter}
+                onCategoriaChange={handleCategoriaChange}
+                subcategoriaFilter={subcategoriaFilter}
+                onSubcategoriaChange={handleSubcategoriaChange}
                 currentPage={currentPage}
                 totalPages={totalPages}
                 onPageChange={setCurrentPage}

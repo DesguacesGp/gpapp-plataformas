@@ -363,6 +363,45 @@ export type Database = {
           },
         ]
       }
+      vauner_category_mapping: {
+        Row: {
+          articulo_pattern: string | null
+          created_at: string
+          description_pattern: string | null
+          id: string
+          is_active: boolean
+          nueva_categoria: string
+          nueva_subcategoria: string
+          original_category: string
+          priority: number
+          updated_at: string
+        }
+        Insert: {
+          articulo_pattern?: string | null
+          created_at?: string
+          description_pattern?: string | null
+          id?: string
+          is_active?: boolean
+          nueva_categoria: string
+          nueva_subcategoria: string
+          original_category: string
+          priority?: number
+          updated_at?: string
+        }
+        Update: {
+          articulo_pattern?: string | null
+          created_at?: string
+          description_pattern?: string | null
+          id?: string
+          is_active?: boolean
+          nueva_categoria?: string
+          nueva_subcategoria?: string
+          original_category?: string
+          priority?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       vauner_config: {
         Row: {
           config_key: string
@@ -393,6 +432,7 @@ export type Database = {
           año_hasta: string | null
           articulo: string | null
           bullet_points: string[] | null
+          categoria: string | null
           category: string | null
           compatibility_image_url: string | null
           created_at: string
@@ -406,6 +446,7 @@ export type Database = {
           raw_data: Json | null
           sku: string
           stock: number
+          subcategoria: string | null
           translated_title: string | null
           updated_at: string
         }
@@ -414,6 +455,7 @@ export type Database = {
           año_hasta?: string | null
           articulo?: string | null
           bullet_points?: string[] | null
+          categoria?: string | null
           category?: string | null
           compatibility_image_url?: string | null
           created_at?: string
@@ -427,6 +469,7 @@ export type Database = {
           raw_data?: Json | null
           sku: string
           stock?: number
+          subcategoria?: string | null
           translated_title?: string | null
           updated_at?: string
         }
@@ -435,6 +478,7 @@ export type Database = {
           año_hasta?: string | null
           articulo?: string | null
           bullet_points?: string[] | null
+          categoria?: string | null
           category?: string | null
           compatibility_image_url?: string | null
           created_at?: string
@@ -448,6 +492,7 @@ export type Database = {
           raw_data?: Json | null
           sku?: string
           stock?: number
+          subcategoria?: string | null
           translated_title?: string | null
           updated_at?: string
         }

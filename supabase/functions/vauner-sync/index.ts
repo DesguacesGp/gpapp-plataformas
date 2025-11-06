@@ -454,7 +454,32 @@ Deno.serve(async (req) => {
           console.log('ℹ️ No products need image processing')
         }
 
-        // Step 4: Trigger continuous AI processing for ALL unprocessed products
+        // Step 4: Trigger product categorization
+        console.log('🏷️ Triggering product categorization...')
+        
+        try {
+          const categorizationResponse = await fetch(
+            `${Deno.env.get('SUPABASE_URL')}/functions/v1/categorize-vauner-products`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                'Content-Type': 'application/json',
+              }
+            }
+          )
+          
+          if (categorizationResponse.ok) {
+            const categorizationResult = await categorizationResponse.json()
+            console.log('✅ Categorization completed:', categorizationResult)
+          } else {
+            console.error('❌ Categorization failed:', categorizationResponse.status)
+          }
+        } catch (categorizationError) {
+          console.error('❌ Error in categorization:', categorizationError)
+        }
+
+        // Step 5: Trigger continuous AI processing for ALL unprocessed products
         console.log('Starting continuous AI processing for all unprocessed products...')
         
         // Get count of unprocessed products
